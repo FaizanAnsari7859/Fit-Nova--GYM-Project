@@ -1,0 +1,62 @@
+<section class="section" id="contact">
+  <div class="container contact-grid">
+    <div>
+      <p class="eyebrow">Contact</p>
+      <h2>Visit the club or send a note.</h2>
+      <p class="lead">Tell us what you want to train for. A coach will follow up with the right starting plan.</p>
+      <ul class="details">
+        <li>
+          <strong>Address</strong>
+          <span>124 Harbour Street, Level 2, Mumbai 400001</span>
+        </li>
+        <li>
+          <strong>Phone</strong>
+          <a href="tel:+919800012345">+91 98000 12345</a>
+        </li>
+        <li>
+          <strong>Email</strong>
+          <a href="mailto:hello@fitnova.gym">hello@fitnova.gym</a>
+        </li>
+        <li>
+          <strong>Hours</strong>
+          <span>Open every day, 5:00 AM – 11:00 PM</span>
+        </li>
+      </ul>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <label>
+        Name
+        <input type="text" formControlName="name" autocomplete="name" />
+        @if (showError('name')) {
+          <small>Enter your name.</small>
+        }
+      </label>
+      <label>
+        Email
+        <input type="email" formControlName="email" autocomplete="email" />
+        @if (showError('email')) {
+          <small>Enter a valid email address.</small>
+        }
+      </label>
+      <label>
+        Phone
+        <input type="tel" formControlName="phone" autocomplete="tel" />
+        @if (showError('phone')) {
+          <small>Enter a phone number with at least 8 digits.</small>
+        }
+      </label>
+      <label>
+        Message
+        <textarea rows="5" formControlName="message"></textarea>
+        @if (showError('message')) {
+          <small>Write a message of at least 10 characters.</small>
+        }
+      </label>
+      <button class="btn btn-accent" type="submit">Send message</button>
+      @if (sent()) {
+        <p class="success" role="status">Message received. We will be in touch shortly.</p>
+      }
+    </form>
+  </div>
+</section>

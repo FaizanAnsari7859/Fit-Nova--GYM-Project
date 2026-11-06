@@ -1,0 +1,21 @@
+<section class="section" id="trainers">
+  <div class="container">
+    <div class="section-heading">
+      <p class="eyebrow">Trainers</p>
+      <h2>Coaches who stay on the floor with you.</h2>
+      <p>Meet the FitNova team. Each coach owns a specialty and shares the same standard.</p>
+    </div>
+    <div class="grid">
+      @for (trainer of trainers; track trainer.name) {
+        <article>
+          <img [src]="trainer.image" [alt]="trainer.alt" />
+          <div class="meta">
+            <h3>{{ trainer.name }}</h3>
+            <p>{{ trainer.specialization }}</p>
+            <span>{{ trainer.experience }} experience</span>
+          </div>
+        </article>
+      }
+    </div>
+  </div>
+</section>

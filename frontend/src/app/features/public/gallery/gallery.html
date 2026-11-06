@@ -1,0 +1,15 @@
+<section class="section" id="gallery">
+  <div class="container">
+    <div class="section-heading">
+      <p class="eyebrow">Gallery</p>
+      <h2>The floor, the work, the room.</h2>
+    </div>
+    <div class="grid">
+      @for (image of images; track image.src) {
+        <figure>
+          <img [src]="image.src" [alt]="image.alt" />
+        </figure>
+      }
+    </div>
+  </div>
+</section>

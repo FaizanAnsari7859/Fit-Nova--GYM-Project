@@ -1,0 +1,31 @@
+<header class="navbar">
+  <div class="container bar">
+    <a class="logo" routerLink="/" fragment="home" (click)="closeMenu()">
+      Fit<span>Nova</span>
+    </a>
+
+    <button
+      type="button"
+      class="menu-button"
+      [attr.aria-expanded]="menuOpen()"
+      aria-controls="primary-nav"
+      (click)="toggleMenu()"
+    >
+      <span class="sr-only">{{ menuOpen() ? 'Close menu' : 'Open menu' }}</span>
+      <span class="bars" aria-hidden="true"></span>
+    </button>
+
+    <nav id="primary-nav" [class.open]="menuOpen()">
+      <a routerLink="/" fragment="home" (click)="closeMenu()">Home</a>
+      <a routerLink="/" fragment="about" (click)="closeMenu()">About</a>
+      <a routerLink="/" fragment="services" (click)="closeMenu()">Services</a>
+      <a routerLink="/" fragment="trainers" (click)="closeMenu()">Trainers</a>
+      <a routerLink="/" fragment="membership" (click)="closeMenu()">Membership</a>
+      <a routerLink="/" fragment="contact" (click)="closeMenu()">Contact</a>
+      <div class="nav-actions">
+        <a class="btn btn-ghost" routerLink="/login" (click)="closeMenu()">Login</a>
+        <a class="btn btn-accent" routerLink="/register" (click)="closeMenu()">Register</a>
+      </div>
+    </nav>
+  </div>
+</header>

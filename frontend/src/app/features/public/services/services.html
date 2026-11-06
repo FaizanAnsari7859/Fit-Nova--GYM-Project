@@ -1,0 +1,18 @@
+<section class="section services" id="services">
+  <div class="container">
+    <div class="section-heading">
+      <p class="eyebrow">Services</p>
+      <h2>Training that covers strength, conditioning, and recovery.</h2>
+      <p>Choose a focus or combine them. Every service is coached on the FitNova floor.</p>
+    </div>
+    <div class="grid">
+      @for (service of services; track service.title) {
+        <article>
+          <span class="index">0{{ $index + 1 }}</span>
+          <h3>{{ service.title }}</h3>
+          <p>{{ service.description }}</p>
+        </article>
+      }
+    </div>
+  </div>
+</section>

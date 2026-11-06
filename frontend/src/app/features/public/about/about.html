@@ -1,0 +1,29 @@
+<section class="section" id="about">
+  <div class="container about-grid">
+    <div class="photos">
+      <img src="/images/about.jpg" alt="Modern FitNova training floor with free weights" />
+      <img src="/images/equipment.jpg" alt="Athlete training with dumbbells" />
+    </div>
+    <div>
+      <p class="eyebrow">About FitNova</p>
+      <h2>A private training floor built for people who take progress seriously.</h2>
+      <p class="lead">
+        FitNova is a performance gym for strength, conditioning, and recovery. The floor is
+        stocked with commercial equipment, the coaching is personal, and every program starts
+        with how you move today.
+      </p>
+      <p class="lead space">
+        Whether you are starting your first cycle or preparing for competition, you train in a
+        room that respects effort and keeps the details sharp.
+      </p>
+      <ul class="stats">
+        @for (item of highlights; track item.label) {
+          <li>
+            <strong>{{ item.value }}</strong>
+            <span>{{ item.label }}</span>
+          </li>
+        }
+      </ul>
+    </div>
+  </div>
+</section>

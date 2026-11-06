@@ -1,0 +1,79 @@
+.plans {
+  background:
+    radial-gradient(circle at top right, rgba(255, 107, 0, 0.16), transparent 28%),
+    var(--color-bg);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+article {
+  display: flex;
+  flex-direction: column;
+  padding: 28px 24px;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+article:hover,
+article.featured {
+  transform: translateY(-6px);
+  border-color: var(--color-accent);
+}
+
+h3 {
+  margin: 0;
+  font-size: 1.7rem;
+}
+
+.price {
+  margin: 18px 0 0;
+  font-family: var(--font-display);
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.price span,
+.duration {
+  color: var(--color-muted);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+ul {
+  flex: 1;
+  margin: 18px 0 24px;
+  padding: 0;
+  list-style: none;
+}
+
+li {
+  position: relative;
+  margin-bottom: 10px;
+  padding-left: 18px;
+  color: var(--color-muted);
+}
+
+li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
