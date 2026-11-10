@@ -1,0 +1,119 @@
+<div class="page-header">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Trainer Dashboard</div>
+      <div class="topbar-breadcrumb">FitNova · Trainer · Overview</div>
+    </div>
+  </div>
+</div>
+
+<div class="page-content">
+  @if (loading()) {
+    <div class="spinner-overlay">
+      <div class="spinner-sm"></div>
+      Loading trainer data…
+    </div>
+  } @else if (error()) {
+    <div class="alert alert-error">{{ error() }}</div>
+  } @else if (overview()) {
+    <!-- Stat cards -->
+    <div class="stats-grid">
+      <div class="stat-card accent">
+        <div class="stat-icon">👥</div>
+        <div class="stat-value">{{ overview()!.totalAssignedMembers }}</div>
+        <div class="stat-label">Assigned Members</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📋</div>
+        <div class="stat-value">{{ overview()!.totalWorkouts }}</div>
+        <div class="stat-label">Assigned Workouts</div>
+      </div>
+    </div>
+
+    <!-- Assigned members -->
+    <div class="section-card">
+      <div class="section-card-header">
+        <h2 class="section-card-title">My Assigned Members</h2>
+      </div>
+      @if (overview()!.assignedMembers.length === 0) {
+        <div class="empty-state">
+          <div class="empty-icon">👥</div>
+          <div class="empty-title">No members assigned yet</div>
+          <p style="color: var(--color-muted); font-size: 0.88rem;">
+            When workouts are assigned to you by an admin, members will appear here.
+          </p>
+        </div>
+      } @else {
+        <div class="data-table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Phone</th>
+                <th>Gender</th>
+                <th>Member Since</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (member of overview()!.assignedMembers; track member._id) {
+                <tr>
+                  <td>
+                    <div class="user-cell">
+                      <div class="user-cell-avatar">{{ getInitials(member.fullName) }}</div>
+                      <div>
+                        <div class="user-cell-name">{{ member.fullName }}</div>
+                        <div class="user-cell-email">{{ member.email }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>{{ member.phone }}</td>
+                  <td style="text-transform: capitalize;">{{ member.gender }}</td>
+                  <td>{{ member.createdAt | date:'mediumDate' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+
+    <!-- Workouts summary -->
+    <div class="section-card">
+      <div class="section-card-header">
+        <h2 class="section-card-title">Assigned Workouts</h2>
+      </div>
+      @if (overview()!.workouts.length === 0) {
+        <div class="empty-state">
+          <div class="empty-icon">🏋️</div>
+          <div class="empty-title">No workouts assigned yet</div>
+        </div>
+      } @else {
+        <div class="data-table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Workout Name</th>
+                <th>Category</th>
+                <th>Duration (mins)</th>
+                <th>Member</th>
+                <th>Assigned Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (w of overview()!.workouts; track w._id) {
+                <tr>
+                  <td style="font-weight: 700;">{{ w.workoutName }}</td>
+                  <td><span class="badge badge-trainer">{{ w.category }}</span></td>
+                  <td>{{ w.duration }} min</td>
+                  <td>{{ w.assignedMember?.fullName ?? 'N/A' }}</td>
+                  <td>{{ w.createdAt | date:'mediumDate' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+</div>
+

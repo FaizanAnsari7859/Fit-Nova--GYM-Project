@@ -1,0 +1,143 @@
+<!-- Page header -->
+<div class="page-header">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">My Profile</div>
+      <div class="topbar-breadcrumb">FitNova · Account Settings</div>
+    </div>
+  </div>
+</div>
+
+<div class="page-content">
+  <div class="profile-layout">
+    <!-- User summary card -->
+    <div class="section-card user-overview-card">
+      <div class="profile-avatar-large">{{ userInitials() }}</div>
+      <h2 class="user-display-name">{{ currentUser()?.fullName }}</h2>
+      <span class="badge" [class.badge-admin]="currentUser()?.role === 'admin'" [class.badge-trainer]="currentUser()?.role === 'trainer'" [class.badge-member]="currentUser()?.role === 'member'">
+        {{ currentUser()?.role }}
+      </span>
+
+      <div class="user-meta-list">
+        <div class="meta-item">
+          <span class="meta-label">Email:</span>
+          <span class="meta-value">{{ currentUser()?.email }}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Phone:</span>
+          <span class="meta-value">{{ currentUser()?.phone }}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Member Since:</span>
+          <span class="meta-value">{{ currentUser()?.createdAt | date:'mediumDate' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Forms column -->
+    <div class="forms-column">
+      <!-- Edit Profile Details -->
+      <div class="section-card">
+        <div class="section-card-header">
+          <h3 class="section-card-title">Personal Information</h3>
+        </div>
+
+        @if (profileSuccess()) {
+          <div class="alert alert-success">{{ profileSuccess() }}</div>
+        }
+        @if (profileError()) {
+          <div class="alert alert-error">{{ profileError() }}</div>
+        }
+
+        <form [formGroup]="profileForm" (ngSubmit)="submitProfile()">
+          <div class="form-grid">
+            <div class="form-field full-width">
+              <label>Full Name *</label>
+              <input formControlName="fullName" type="text" [class.invalid]="isProfileInvalid('fullName')" />
+              @if (isProfileInvalid('fullName')) {
+                <span class="error-text">Full name must be 2–80 characters.</span>
+              }
+            </div>
+
+            <div class="form-field">
+              <label>Phone Number *</label>
+              <input formControlName="phone" type="tel" [class.invalid]="isProfileInvalid('phone')" />
+              @if (isProfileInvalid('phone')) {
+                <span class="error-text">Phone must be 10–15 digits.</span>
+              }
+            </div>
+
+            <div class="form-field">
+              <label>Gender *</label>
+              <select formControlName="gender">
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div class="form-field full-width">
+              <label>Date of Birth</label>
+              <input formControlName="dateOfBirth" type="date" />
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-accent btn-sm" [disabled]="savingProfile()">
+              @if (savingProfile()) { Saving… } @else { Save Profile }
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Security / Change Password -->
+      <div class="section-card">
+        <div class="section-card-header">
+          <h3 class="section-card-title">Change Password</h3>
+        </div>
+
+        @if (passwordSuccess()) {
+          <div class="alert alert-success">{{ passwordSuccess() }}</div>
+        }
+        @if (passwordError()) {
+          <div class="alert alert-error">{{ passwordError() }}</div>
+        }
+
+        <form [formGroup]="passwordForm" (ngSubmit)="submitPassword()">
+          <div class="form-grid">
+            <div class="form-field full-width">
+              <label>Current Password *</label>
+              <input formControlName="currentPassword" type="password" placeholder="Enter your current password" [class.invalid]="isPasswordInvalid('currentPassword')" />
+              @if (isPasswordInvalid('currentPassword')) {
+                <span class="error-text">Current password is required.</span>
+              }
+            </div>
+
+            <div class="form-field">
+              <label>New Password *</label>
+              <input formControlName="newPassword" type="password" placeholder="Min 8 characters" [class.invalid]="isPasswordInvalid('newPassword')" />
+              @if (isPasswordInvalid('newPassword')) {
+                <span class="error-text">New password must be at least 8 characters.</span>
+              }
+            </div>
+
+            <div class="form-field">
+              <label>Confirm New Password *</label>
+              <input formControlName="confirmPassword" type="password" placeholder="Repeat new password" [class.invalid]="isPasswordInvalid('confirmPassword') || passwordMismatch" />
+              @if (passwordMismatch) {
+                <span class="error-text">Passwords do not match.</span>
+              }
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-accent btn-sm" [disabled]="changingPassword()">
+              @if (changingPassword()) { Updating… } @else { Update Password }
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+

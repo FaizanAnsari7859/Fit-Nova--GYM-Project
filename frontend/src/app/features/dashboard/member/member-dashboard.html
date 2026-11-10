@@ -1,0 +1,183 @@
+<div class="page-header">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Member Dashboard</div>
+      <div class="topbar-breadcrumb">FitNova · Member · Overview</div>
+    </div>
+  </div>
+</div>
+
+<div class="page-content">
+  @if (loading()) {
+    <div class="spinner-overlay">
+      <div class="spinner-sm"></div>
+      Loading your dashboard…
+    </div>
+  } @else if (error()) {
+    <div class="alert alert-error">{{ error() }}</div>
+  } @else {
+    <!-- Stat cards -->
+    <div class="stats-grid">
+      <div class="stat-card accent">
+        <div class="stat-icon">🏋️</div>
+        <div class="stat-value">{{ overview()?.totalWorkouts ?? 0 }}</div>
+        <div class="stat-label">Assigned Workouts</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🏷️</div>
+        <div class="stat-value" style="font-size: 1.4rem;">
+          {{ overview()?.activePlan?.planName ?? 'No Active Plan' }}
+        </div>
+        <div class="stat-label">Membership Plan</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">💳</div>
+        <div class="stat-value">{{ overview()?.payments?.length ?? 0 }}</div>
+        <div class="stat-label">Payment Records</div>
+      </div>
+    </div>
+
+    <!-- Personal profile -->
+    <div class="section-card">
+      <div class="section-card-header">
+        <h2 class="section-card-title">Personal Profile</h2>
+      </div>
+      @if (currentUser()) {
+        <div class="info-grid">
+          <div class="info-row">
+            <div class="info-label">Full Name</div>
+            <div class="info-value">{{ currentUser()!.fullName }}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">Email</div>
+            <div class="info-value">{{ currentUser()!.email }}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">Phone</div>
+            <div class="info-value">{{ currentUser()!.phone }}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">Gender</div>
+            <div class="info-value" style="text-transform: capitalize;">{{ currentUser()!.gender }}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">Date of Birth</div>
+            <div class="info-value">{{ currentUser()!.dateOfBirth | date:'mediumDate' }}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">Member Since</div>
+            <div class="info-value">{{ currentUser()!.createdAt | date:'mediumDate' }}</div>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Active plan -->
+    <div class="section-card">
+      <div class="section-card-header">
+        <h2 class="section-card-title">Active Membership Plan</h2>
+      </div>
+      @if (overview()?.activePlan) {
+        <div class="plan-card">
+          <div class="plan-header">
+            <div>
+              <div class="plan-name">{{ overview()!.activePlan!.planName }}</div>
+              <div class="plan-duration">{{ overview()!.activePlan!.duration }} days access</div>
+            </div>
+            <div class="plan-price">
+              {{ overview()!.activePlan!.price | currency:'USD':'symbol':'1.0-0' }}
+            </div>
+          </div>
+          @if (overview()!.activePlan!.features.length > 0) {
+            <ul class="plan-features">
+              @for (feat of overview()!.activePlan!.features; track feat) {
+                <li>✓ {{ feat }}</li>
+              }
+            </ul>
+          }
+        </div>
+      } @else {
+        <div class="empty-state">
+          <div class="empty-icon">🏷️</div>
+          <div class="empty-title">No active membership plan</div>
+          <p style="color: var(--color-muted); font-size: 0.88rem;">
+            Contact the gym desk to subscribe to a membership plan.
+          </p>
+        </div>
+      }
+    </div>
+
+    <!-- Workouts -->
+    <div class="section-card">
+      <div class="section-card-header">
+        <h2 class="section-card-title">My Workouts</h2>
+      </div>
+      @if (!overview()?.workouts || overview()!.workouts.length === 0) {
+        <div class="empty-state">
+          <div class="empty-icon">📋</div>
+          <div class="empty-title">No workouts assigned yet</div>
+          <p style="color: var(--color-muted); font-size: 0.88rem;">
+            Your assigned trainer will assign your custom workout plans here.
+          </p>
+        </div>
+      } @else {
+        <div class="data-table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Workout</th>
+                <th>Category</th>
+                <th>Duration</th>
+                <th>Trainer</th>
+                <th>Assigned Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (w of overview()!.workouts; track w._id) {
+                <tr>
+                  <td style="font-weight: 700;">{{ w.workoutName }}</td>
+                  <td><span class="badge badge-member">{{ w.category }}</span></td>
+                  <td>{{ w.duration }} mins</td>
+                  <td>{{ w.assignedTrainer?.fullName ?? 'Assigned Trainer' }}</td>
+                  <td>{{ w.createdAt | date:'mediumDate' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+
+    <!-- Payments -->
+    @if (overview()?.payments && overview()!.payments.length > 0) {
+      <div class="section-card">
+        <div class="section-card-header">
+          <h2 class="section-card-title">Payment History</h2>
+        </div>
+        <div class="data-table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Reference</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of overview()!.payments; track p._id) {
+                <tr>
+                  <td style="font-family: monospace; font-size: 0.82rem;">{{ p.transactionReference }}</td>
+                  <td style="font-weight: 700;">{{ p.amount | currency:'USD':'symbol':'1.0-0' }}</td>
+                  <td><span [class]="getStatusBadgeClass(p.paymentStatus)">{{ p.paymentStatus }}</span></td>
+                  <td>{{ p.paymentDate | date:'mediumDate' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+  }
+</div>
+

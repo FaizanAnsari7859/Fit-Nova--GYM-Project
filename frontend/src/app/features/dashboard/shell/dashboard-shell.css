@@ -1,0 +1,7 @@
+/* Dashboard shell uses shared dashboard.styles.css via global import */
+/* Component-specific overrides only here */
+:host {
+  display: block;
+  min-height: 100vh;
+}
+

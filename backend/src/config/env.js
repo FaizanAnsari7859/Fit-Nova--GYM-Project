@@ -12,10 +12,17 @@ if (!Number.isInteger(port) || port <= 0) {
   throw new Error('PORT must be a positive integer.');
 }
 
+const clientUrlRaw = process.env.CLIENT_URL || 'http://localhost:4200';
+const clientUrls = clientUrlRaw
+  .split(',')
+  .map((url) => url.trim())
+  .filter(Boolean);
+
 const env = {
   port,
   nodeEnv: process.env.NODE_ENV || 'development',
-  clientUrl: process.env.CLIENT_URL || 'http://localhost:4200',
+  clientUrl: clientUrls[0] || 'http://localhost:4200',
+  clientUrls,
   mongoUri: process.env.MONGO_URI || '',
   jwtSecret: process.env.JWT_SECRET || '',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',

@@ -22,10 +22,26 @@
       <a routerLink="/" fragment="trainers" (click)="closeMenu()">Trainers</a>
       <a routerLink="/" fragment="membership" (click)="closeMenu()">Membership</a>
       <a routerLink="/" fragment="contact" (click)="closeMenu()">Contact</a>
-      <div class="nav-actions">
-        <a class="btn btn-ghost" routerLink="/login" (click)="closeMenu()">Login</a>
-        <a class="btn btn-accent" routerLink="/register" (click)="closeMenu()">Register</a>
-      </div>
+      @if (isLoggedIn()) {
+        <a [routerLink]="dashboardLink()" (click)="closeMenu()">Dashboard</a>
+      }
+
+      @if (isLoggedIn()) {
+        <div class="nav-actions auth-user">
+          <a [routerLink]="dashboardLink()" class="user-badge" (click)="closeMenu()">
+            <span class="user-name">{{ currentUser()?.fullName }}</span>
+            <span class="user-role">{{ currentUser()?.role }}</span>
+          </a>
+          <button type="button" class="btn btn-ghost btn-logout" (click)="logout()">
+            Logout
+          </button>
+        </div>
+      } @else {
+        <div class="nav-actions">
+          <a class="btn btn-ghost" routerLink="/login" (click)="closeMenu()">Login</a>
+          <a class="btn btn-accent" routerLink="/register" (click)="closeMenu()">Register</a>
+        </div>
+      }
     </nav>
   </div>
 </header>

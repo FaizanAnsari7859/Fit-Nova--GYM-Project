@@ -1,0 +1,94 @@
+<div class="dashboard-shell">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <a class="logo" routerLink="/">Fit<span>Nova</span></a>
+      @if (userRole()) {
+        <span class="role-tag">{{ userRole() }}</span>
+      }
+    </div>
+
+    <nav class="sidebar-nav">
+      <!-- Admin nav -->
+      @if (userRole() === 'admin') {
+        <span class="nav-section">Admin</span>
+        <a routerLink="/dashboard/admin" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+        <a routerLink="/dashboard/members" routerLinkActive="active">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Members</span>
+        </a>
+        <a routerLink="/dashboard/memberships" routerLinkActive="active">
+          <span class="nav-icon">🏷️</span>
+          <span class="nav-label">Membership Plans</span>
+        </a>
+        <a routerLink="/dashboard/workouts" routerLinkActive="active">
+          <span class="nav-icon">🏋️</span>
+          <span class="nav-label">Workouts</span>
+        </a>
+      }
+
+      <!-- Trainer nav -->
+      @if (userRole() === 'trainer') {
+        <span class="nav-section">Trainer</span>
+        <a routerLink="/dashboard/trainer" routerLinkActive="active">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Overview</span>
+        </a>
+        <a routerLink="/dashboard/workouts" routerLinkActive="active">
+          <span class="nav-icon">🏋️</span>
+          <span class="nav-label">Workouts & Progress</span>
+        </a>
+      }
+
+      <!-- Member nav -->
+      @if (userRole() === 'member') {
+        <span class="nav-section">Member</span>
+        <a routerLink="/dashboard/member" routerLinkActive="active">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-label">My Dashboard</span>
+        </a>
+        <a routerLink="/dashboard/workouts" routerLinkActive="active">
+          <span class="nav-icon">🏋️</span>
+          <span class="nav-label">My Workouts</span>
+        </a>
+        <a routerLink="/dashboard/memberships" routerLinkActive="active">
+          <span class="nav-icon">🏷️</span>
+          <span class="nav-label">Membership Plans</span>
+        </a>
+      }
+
+      <span class="nav-section">Account</span>
+      <a routerLink="/dashboard/profile" routerLinkActive="active">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">My Profile</span>
+      </a>
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+        <span class="nav-icon">🌐</span>
+        <span class="nav-label">Public Site</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      @if (currentUser()) {
+        <div class="user-info-block">
+          <div class="user-avatar">{{ userInitials() }}</div>
+          <div>
+            <div class="u-name">{{ currentUser()?.fullName }}</div>
+            <div class="u-email">{{ currentUser()?.email }}</div>
+          </div>
+        </div>
+      }
+      <button type="button" class="btn-logout-sidebar" (click)="logout()">
+        <span>🚪</span> Logout
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main area -->
+  <main class="dashboard-main">
+    <router-outlet />
+  </main>
+</div>

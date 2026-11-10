@@ -1,6 +1,32 @@
 import mongoose from 'mongoose';
 import User from './user.model.js';
 
+const exerciseSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    sets: {
+      type: Number,
+      default: 3,
+      min: 1,
+    },
+    reps: {
+      type: Number,
+      default: 10,
+      min: 1,
+    },
+    weight: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+  },
+  { _id: false },
+);
+
 const workoutSchema = new mongoose.Schema(
   {
     workoutName: {
@@ -26,6 +52,29 @@ const workoutSchema = new mongoose.Schema(
       type: Number,
       required: [true, 'Duration is required.'],
       min: [1, 'Duration must be at least 1 minute.'],
+    },
+    schedule: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: [100, 'Schedule must be 100 characters or fewer.'],
+    },
+    exercises: {
+      type: [exerciseSchema],
+      default: [],
+    },
+    status: {
+      type: String,
+      enum: {
+        values: ['assigned', 'in-progress', 'completed'],
+        message: 'Status must be assigned, in-progress, or completed.',
+      },
+      default: 'assigned',
+      index: true,
+    },
+    completedAt: {
+      type: Date,
+      default: null,
     },
     assignedMember: {
       type: mongoose.Schema.Types.ObjectId,

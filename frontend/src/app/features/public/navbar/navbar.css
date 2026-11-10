@@ -43,8 +43,59 @@ nav > a:hover {
 
 .nav-actions {
   display: flex;
+  align-items: center;
   gap: 10px;
   margin-left: 8px;
+}
+
+.auth-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.user-badge:hover {
+  opacity: 0.85;
+}
+
+.user-name {
+  color: var(--color-text);
+  font-weight: 700;
+  font-size: 0.92rem;
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-role {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.btn-logout {
+  cursor: pointer;
+  border: 1px solid var(--color-line);
+  padding: 8px 16px;
+  font-size: 0.88rem;
+}
+
+.btn-logout:hover {
+  border-color: #ff5a1f;
+  color: #ff5a1f;
 }
 
 .menu-button {
@@ -117,5 +168,15 @@ nav > a:hover {
   .nav-actions {
     flex-direction: column;
     margin: 8px 0 0;
+  }
+
+  .auth-user {
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .user-badge {
+    align-items: flex-start;
+    padding: 8px 8px 0;
   }
 }

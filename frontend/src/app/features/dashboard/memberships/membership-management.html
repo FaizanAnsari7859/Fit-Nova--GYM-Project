@@ -1,0 +1,310 @@
+<!-- Page header -->
+<div class="page-header">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Membership Plans</div>
+      <div class="topbar-breadcrumb">FitNova · Plans & Subscriptions</div>
+    </div>
+    @if (userRole() === 'admin') {
+      <button type="button" class="btn btn-accent btn-sm" (click)="openAdd()">+ Add Plan</button>
+    }
+  </div>
+</div>
+
+<div class="page-content">
+  <!-- Alerts -->
+  @if (success()) {
+    <div class="alert alert-success">{{ success() }}</div>
+  }
+  @if (error() && !modalMode()) {
+    <div class="alert alert-error">{{ error() }}</div>
+  }
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <select class="filter-select" (change)="onStatusFilterChange($event)">
+      <option value="">All Statuses</option>
+      <option value="active">Active Plans</option>
+      <option value="inactive">Inactive Plans</option>
+    </select>
+  </div>
+
+  @if (loading()) {
+    <div class="spinner-overlay">
+      <div class="spinner-sm"></div>
+      Loading membership plans…
+    </div>
+  } @else if (plans().length === 0) {
+    <div class="section-card">
+      <div class="empty-state">
+        <div class="empty-icon">🏷️</div>
+        <div class="empty-title">No membership plans found</div>
+        @if (userRole() === 'admin') {
+          <p style="color: var(--color-muted); font-size: 0.88rem; margin-top: 8px;">
+            Get started by adding your gym's first membership package.
+          </p>
+        }
+      </div>
+    </div>
+  } @else {
+    <!-- Plans Grid -->
+    <div class="plans-grid">
+      @for (plan of plans(); track plan._id) {
+        <div class="plan-card-item" [class.inactive]="plan.status === 'inactive'">
+          <div class="plan-card-top">
+            <div>
+              <span class="plan-badge" [class.badge-active]="plan.status === 'active'" [class.badge-inactive]="plan.status === 'inactive'">
+                {{ plan.status }}
+              </span>
+              <h3 class="plan-card-name">{{ plan.planName }}</h3>
+            </div>
+            <div class="plan-card-price">
+              {{ plan.price | currency:'USD':'symbol':'1.0-0' }}
+              <span class="plan-price-period">/ {{ plan.duration }} days</span>
+            </div>
+          </div>
+
+          @if (plan.description) {
+            <p class="plan-card-desc">{{ plan.description }}</p>
+          }
+
+          <div class="plan-features-list">
+            @for (feature of plan.features; track feature) {
+              <div class="plan-feature-row">
+                <span class="check-icon">✓</span>
+                <span>{{ feature }}</span>
+              </div>
+            }
+          </div>
+
+          <div class="plan-card-footer">
+            <button type="button" class="btn btn-ghost btn-sm" (click)="openView(plan)">Details</button>
+            @if (userRole() === 'admin') {
+              <button type="button" class="btn btn-accent btn-sm" (click)="openAssign(plan)">Assign Member</button>
+              <div class="plan-actions-group">
+                <button type="button" class="btn-icon primary" title="Edit" (click)="openEdit(plan)">✏️</button>
+                <button type="button" class="btn-icon danger" title="Delete" (click)="openDelete(plan)">🗑</button>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+<!-- ── CREATE / EDIT PLAN MODAL ───────────────────────── -->
+@if (modalMode() === 'add' || modalMode() === 'edit') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2 class="modal-title">{{ modalMode() === 'add' ? 'Create Membership Plan' : 'Edit Membership Plan' }}</h2>
+        <button type="button" class="btn-close-modal" (click)="closeModal()">✕</button>
+      </div>
+
+      @if (error()) {
+        <div class="alert alert-error">{{ error() }}</div>
+      }
+
+      <form [formGroup]="planForm" (ngSubmit)="submitPlan()">
+        <div class="form-grid">
+          <div class="form-field full-width">
+            <label>Plan Name *</label>
+            <input formControlName="planName" type="text" placeholder="e.g. Nova Pro Monthly" [class.invalid]="isInvalid('planName')" />
+            @if (isInvalid('planName')) {
+              <span class="error-text">Plan name is required (max 80 chars).</span>
+            }
+          </div>
+
+          <div class="form-field">
+            <label>Duration (days) *</label>
+            <input formControlName="duration" type="number" min="1" [class.invalid]="isInvalid('duration')" />
+            @if (isInvalid('duration')) {
+              <span class="error-text">Duration must be at least 1 day.</span>
+            }
+          </div>
+
+          <div class="form-field">
+            <label>Price ($ USD) *</label>
+            <input formControlName="price" type="number" min="0" [class.invalid]="isInvalid('price')" />
+            @if (isInvalid('price')) {
+              <span class="error-text">Price cannot be negative.</span>
+            }
+          </div>
+
+          <div class="form-field full-width">
+            <label>Description</label>
+            <input formControlName="description" type="text" placeholder="Brief summary of the plan benefits" />
+          </div>
+
+          <div class="form-field full-width">
+            <label>Features (comma separated)</label>
+            <input formControlName="featuresText" type="text" placeholder="Gym access, Locker, Sauna, Free trainer assessment" />
+          </div>
+
+          <div class="form-field full-width">
+            <label>Plan Status *</label>
+            <select formControlName="status">
+              <option value="active">Active (available for subscription)</option>
+              <option value="inactive">Inactive (hidden / archived)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-accent btn-sm" [disabled]="submitting()">
+            @if (submitting()) { Saving… } @else { {{ modalMode() === 'add' ? 'Create Plan' : 'Save Changes' }} }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ── ASSIGN PLAN TO MEMBER MODAL ────────────────────── -->
+@if (modalMode() === 'assign' && selectedPlan()) {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Assign Plan to Member</h2>
+          <div class="topbar-breadcrumb">Plan: {{ selectedPlan()!.planName }}</div>
+        </div>
+        <button type="button" class="btn-close-modal" (click)="closeModal()">✕</button>
+      </div>
+
+      @if (error()) {
+        <div class="alert alert-error">{{ error() }}</div>
+      }
+
+      <form [formGroup]="assignForm" (ngSubmit)="submitAssign()">
+        <div class="form-grid">
+          <div class="form-field full-width">
+            <label>Select Member *</label>
+            <select formControlName="memberId">
+              <option value="">Select a member…</option>
+              @for (m of members(); track m._id) {
+                <option [value]="m._id">{{ m.fullName }} ({{ m.email }})</option>
+              }
+            </select>
+            @if (members().length === 0) {
+              <span class="error-text">No members available. Please create members first.</span>
+            }
+          </div>
+
+          <div class="form-field">
+            <label>Amount Charged ($ USD) *</label>
+            <input formControlName="amount" type="number" min="0" />
+          </div>
+
+          <div class="form-field">
+            <label>Payment Status *</label>
+            <select formControlName="paymentStatus">
+              <option value="paid">Paid (Activate immediately)</option>
+              <option value="pending">Pending</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-accent btn-sm" [disabled]="submitting() || !assignForm.valid">
+            @if (submitting()) { Assigning… } @else { Confirm Assignment }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ── VIEW PLAN MODAL ────────────────────────────────── -->
+@if (modalMode() === 'view' && selectedPlan()) {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">{{ selectedPlan()!.planName }}</h2>
+          <span class="plan-badge" [class.badge-active]="selectedPlan()!.status === 'active'" [class.badge-inactive]="selectedPlan()!.status === 'inactive'">
+            {{ selectedPlan()!.status }}
+          </span>
+        </div>
+        <button type="button" class="btn-close-modal" (click)="closeModal()">✕</button>
+      </div>
+
+      @if (selectedPlan()!.description) {
+        <p style="color: var(--color-muted); margin-bottom: 20px;">{{ selectedPlan()!.description }}</p>
+      }
+
+      <div class="info-grid">
+        <div class="info-row">
+          <div class="info-label">Price</div>
+          <div class="info-value" style="color: var(--color-accent);">
+            {{ selectedPlan()!.price | currency:'USD':'symbol':'1.0-0' }}
+          </div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Access Duration</div>
+          <div class="info-value">{{ selectedPlan()!.duration }} Days</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Created At</div>
+          <div class="info-value">{{ selectedPlan()!.createdAt | date:'mediumDate' }}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Last Updated</div>
+          <div class="info-value">{{ selectedPlan()!.updatedAt | date:'mediumDate' }}</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 24px;">
+        <h4 style="font-family: var(--font-display); font-size: 1.1rem; margin-bottom: 12px;">Included Features</h4>
+        <div class="plan-features-list">
+          @for (f of selectedPlan()!.features; track f) {
+            <div class="plan-feature-row">
+              <span class="check-icon">✓</span>
+              <span>{{ f }}</span>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost btn-sm" (click)="closeModal()">Close</button>
+        @if (userRole() === 'admin') {
+          <button type="button" class="btn btn-accent btn-sm" (click)="openEdit(selectedPlan()!)">Edit Plan</button>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ── DELETE PLAN MODAL ──────────────────────────────── -->
+@if (modalMode() === 'delete' && selectedPlan()) {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2 class="modal-title">Delete Membership Plan</h2>
+        <button type="button" class="btn-close-modal" (click)="closeModal()">✕</button>
+      </div>
+      @if (error()) {
+        <div class="alert alert-error">{{ error() }}</div>
+      }
+      <div class="confirm-dialog">
+        <div class="confirm-icon">⚠️</div>
+        <p>
+          Are you sure you want to delete
+          <strong>{{ selectedPlan()!.planName }}</strong>?
+          Existing active subscribers will remain recorded.
+        </p>
+        <div class="form-actions" style="justify-content: center;">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="closeModal()">Cancel</button>
+          <button type="button" class="btn btn-sm btn-danger" [disabled]="submitting()" (click)="confirmDelete()">
+            @if (submitting()) { Deleting… } @else { Delete Plan }
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+

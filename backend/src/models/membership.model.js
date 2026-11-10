@@ -8,6 +8,12 @@ const membershipSchema = new mongoose.Schema(
       trim: true,
       maxlength: [80, 'Plan name must be 80 characters or fewer.'],
     },
+    description: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: [500, 'Description must be 500 characters or fewer.'],
+    },
     duration: {
       type: Number,
       required: [true, 'Duration is required.'],

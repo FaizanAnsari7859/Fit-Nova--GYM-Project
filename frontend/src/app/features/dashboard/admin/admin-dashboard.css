@@ -1,0 +1,39 @@
+:host { display: block; }
+
+.page-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(11, 11, 11, 0.9);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+}
+
+.topbar-title {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.topbar-breadcrumb {
+  font-size: 0.82rem;
+  color: var(--color-muted);
+  margin-top: 2px;
+}
+
+.page-content {
+  padding: 32px;
+}
+
+@media (max-width: 768px) {
+  .topbar { padding: 14px 20px; }
+  .page-content { padding: 20px 16px; }
+}
+

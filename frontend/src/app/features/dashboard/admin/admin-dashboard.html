@@ -1,0 +1,93 @@
+<div class="page-header">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Admin Dashboard</div>
+      <div class="topbar-breadcrumb">FitNova · Overview</div>
+    </div>
+  </div>
+</div>
+
+<div class="page-content">
+  @if (loading()) {
+  <div class="spinner-overlay">
+    <div class="spinner-sm"></div>
+    Loading dashboard data…
+  </div>
+  } @else if (error()) {
+  <div class="alert alert-error">{{ error() }}</div>
+  } @else if (stats()) {
+  <!-- Stat cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">👥</div>
+      <div class="stat-value">{{ stats()!.totalMembers }}</div>
+      <div class="stat-label">Total Members</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🏋️</div>
+      <div class="stat-value">{{ stats()!.totalTrainers }}</div>
+      <div class="stat-label">Total Trainers</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">✅</div>
+      <div class="stat-value">{{ stats()!.activeMemberships }}</div>
+      <div class="stat-label">Active Memberships</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">💳</div>
+      <div class="stat-value">{{ stats()!.totalPayments }}</div>
+      <div class="stat-label">Total Payments</div>
+    </div>
+    <div class="stat-card accent">
+      <div class="stat-icon">💰</div>
+      <div class="stat-value">{{ stats()!.totalRevenue | currency:'USD':'symbol':'1.0-0' }}</div>
+      <div class="stat-label">Total Revenue</div>
+    </div>
+  </div>
+
+  <!-- Recent members -->
+  <div class="section-card">
+    <div class="section-card-header">
+      <h2 class="section-card-title">Recent Registrations</h2>
+      <a class="btn btn-ghost btn-sm" routerLink="/dashboard/members">View All</a>
+    </div>
+    @if (stats()!.recentMembers.length === 0) {
+    <div class="empty-state">
+      <div class="empty-icon">👤</div>
+      <div class="empty-title">No members yet</div>
+    </div>
+    } @else {
+    <div class="data-table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Role</th>
+            <th>Phone</th>
+            <th>Joined</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (member of stats()!.recentMembers; track member._id) {
+          <tr>
+            <td>
+              <div class="user-cell">
+                <div class="user-cell-avatar">{{ getInitials(member.fullName) }}</div>
+                <div>
+                  <div class="user-cell-name">{{ member.fullName }}</div>
+                  <div class="user-cell-email">{{ member.email }}</div>
+                </div>
+              </div>
+            </td>
+            <td><span [class]="getRoleBadgeClass(member.role)">{{ member.role }}</span></td>
+            <td>{{ member.phone }}</td>
+            <td>{{ member.createdAt | date:'mediumDate' }}</td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    }
+  </div>
+  }
+</div>

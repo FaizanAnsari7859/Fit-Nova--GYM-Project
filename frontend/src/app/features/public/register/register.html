@@ -1,11 +1,158 @@
 <section class="auth">
   <div class="card">
     <p class="eyebrow">FitNova</p>
-    <h1>Register</h1>
-    <p>Join as a member or trainer. Account registration will be connected in the authentication step.</p>
-    <div class="actions">
-      <a class="btn btn-accent" routerLink="/login">Login</a>
-      <a class="btn btn-ghost" routerLink="/" fragment="membership">View plans</a>
+    <h1>Create Account</h1>
+    <p class="subtitle">Join as a club member or fitness trainer to unlock personalized training.</p>
+
+    @if (errorMessage()) {
+      <div class="alert-error" role="alert">
+        {{ errorMessage() }}
+      </div>
+    }
+
+    @if (successMessage()) {
+      <div class="alert-success" role="alert">
+        {{ successMessage() }}
+      </div>
+    }
+
+    <form class="auth-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <div class="form-row">
+        <div class="field">
+          <label for="reg-fullName">Full Name</label>
+          <input
+            id="reg-fullName"
+            type="text"
+            formControlName="fullName"
+            placeholder="John Doe"
+            autocomplete="name"
+            [class.invalid]="isInvalid('fullName')"
+          />
+          @if (isInvalid('fullName')) {
+            <small class="error-text">Full name must be at least 2 characters.</small>
+          }
+        </div>
+
+        <div class="field">
+          <label for="reg-email">Email Address</label>
+          <input
+            id="reg-email"
+            type="email"
+            formControlName="email"
+            placeholder="john@example.com"
+            autocomplete="email"
+            [class.invalid]="isInvalid('email')"
+          />
+          @if (isInvalid('email')) {
+            <small class="error-text">Please enter a valid email address.</small>
+          }
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="reg-phone">Phone Number</label>
+          <input
+            id="reg-phone"
+            type="tel"
+            formControlName="phone"
+            placeholder="9876543210 (10–15 digits)"
+            autocomplete="tel"
+            [class.invalid]="isInvalid('phone')"
+          />
+          @if (isInvalid('phone')) {
+            <small class="error-text">Phone must contain 10 to 15 digits.</small>
+          }
+        </div>
+
+        <div class="field">
+          <label for="reg-role">Account Type</label>
+          <select id="reg-role" formControlName="role" [class.invalid]="isInvalid('role')">
+            <option value="member">Club Member</option>
+            <option value="trainer">Fitness Trainer</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="reg-gender">Gender</label>
+          <select id="reg-gender" formControlName="gender" [class.invalid]="isInvalid('gender')">
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="reg-dob">Date of Birth</label>
+          <input
+            id="reg-dob"
+            type="date"
+            formControlName="dateOfBirth"
+            [class.invalid]="isInvalid('dateOfBirth')"
+          />
+          @if (isInvalid('dateOfBirth')) {
+            <small class="error-text">
+              @if (form.controls.dateOfBirth.errors?.['required']) {
+                Date of birth is required.
+              } @else if (form.controls.dateOfBirth.errors?.['underage']) {
+                You must be at least 13 years old.
+              } @else {
+                Please enter a valid past date.
+              }
+            </small>
+          }
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="reg-password">Password</label>
+          <input
+            id="reg-password"
+            type="password"
+            formControlName="password"
+            autocomplete="new-password"
+            placeholder="At least 8 characters"
+            [class.invalid]="isInvalid('password')"
+          />
+          @if (isInvalid('password')) {
+            <small class="error-text">Password must be between 8 and 64 characters.</small>
+          }
+        </div>
+
+        <div class="field">
+          <label for="reg-confirmPassword">Confirm Password</label>
+          <input
+            id="reg-confirmPassword"
+            type="password"
+            formControlName="confirmPassword"
+            autocomplete="new-password"
+            placeholder="Repeat password"
+            [class.invalid]="isInvalid('confirmPassword') || passwordMismatch"
+          />
+          @if (passwordMismatch) {
+            <small class="error-text">Passwords do not match.</small>
+          } @else if (isInvalid('confirmPassword')) {
+            <small class="error-text">Please confirm your password.</small>
+          }
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-accent btn-submit" [disabled]="loading()">
+        @if (loading()) {
+          <span class="spinner" aria-hidden="true"></span>
+          <span>Creating Account...</span>
+        } @else {
+          <span>Create Account</span>
+        }
+      </button>
+    </form>
+
+    <div class="footer-nav">
+      <span>Already have an account?</span>
+      <a routerLink="/login">Sign In</a>
     </div>
   </div>
 </section>
