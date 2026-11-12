@@ -7,6 +7,9 @@
   </div>
 </div>
 
+<!-- router outlet for child routes -->
+<router-outlet></router-outlet>
+
 <div class="page-content">
   @if (loading()) {
   <div class="spinner-overlay">
@@ -52,41 +55,41 @@
       <a class="btn btn-ghost btn-sm" routerLink="/dashboard/members">View All</a>
     </div>
     @if (stats()!.recentMembers.length === 0) {
-    <div class="empty-state">
-      <div class="empty-icon">👤</div>
-      <div class="empty-title">No members yet</div>
-    </div>
+      <div class="empty-state">
+        <div class="empty-icon">👤</div>
+        <div class="empty-title">No members yet</div>
+      </div>
     } @else {
-    <div class="data-table-wrapper">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Member</th>
-            <th>Role</th>
-            <th>Phone</th>
-            <th>Joined</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (member of stats()!.recentMembers; track member._id) {
-          <tr>
-            <td>
-              <div class="user-cell">
-                <div class="user-cell-avatar">{{ getInitials(member.fullName) }}</div>
-                <div>
-                  <div class="user-cell-name">{{ member.fullName }}</div>
-                  <div class="user-cell-email">{{ member.email }}</div>
+      <div class="data-table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Member</th>
+              <th>Role</th>
+              <th>Phone</th>
+              <th>Joined</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (member of stats()!.recentMembers; track member._id) {
+            <tr>
+              <td>
+                <div class="user-cell">
+                  <div class="user-cell-avatar">{{ getInitials(member.fullName) }}</div>
+                  <div>
+                    <div class="user-cell-name">{{ member.fullName }}</div>
+                    <div class="user-cell-email">{{ member.email }}</div>
+                  </div>
                 </div>
-              </div>
-            </td>
-            <td><span [class]="getRoleBadgeClass(member.role)">{{ member.role }}</span></td>
-            <td>{{ member.phone }}</td>
-            <td>{{ member.createdAt | date:'mediumDate' }}</td>
-          </tr>
-          }
-        </tbody>
-      </table>
-    </div>
+              </td>
+              <td><span [class]="getRoleBadgeClass(member.role)">{{ member.role }}</span></td>
+              <td>{{ member.phone }}</td>
+              <td>{{ member.createdAt | date:'mediumDate' }}</td>
+            </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     }
   </div>
   }

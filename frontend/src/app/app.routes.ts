@@ -66,6 +66,18 @@ export const routes: Routes = [
             (module) => module.AdminDashboard,
           ),
         title: 'Admin Dashboard · FitNova',
+        children: [
+          {
+            path: 'trainers',
+            canActivate: [roleGuard],
+            data: { roles: ['admin'] },
+            loadComponent: () =>
+              import('./features/dashboard/admin/trainer-management').then(
+                (module) => module.TrainerManagement,
+              ),
+            title: 'Trainer Management · FitNova',
+          },
+        ],
       },
       {
         path: 'members',

@@ -61,6 +61,32 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    specialization: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: [100, 'Specialization must be 100 characters or fewer.'],
+    },
+    experienceYears: {
+      type: Number,
+      default: 0,
+      min: [0, 'Experience years cannot be negative.'],
+    },
+    bio: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: [500, 'Bio must be 500 characters or fewer.'],
+    },
+    certifications: {
+      type: [String],
+      default: [],
+    },
+    assignedTrainer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
   },
   {
     timestamps: { createdAt: true, updatedAt: true },

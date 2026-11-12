@@ -1,33 +1,39 @@
+// workout.controller.js – Handles Workout CRUD and related updates
 import Workout from '../models/workout.model.js';
 import User from '../models/user.model.js';
 import { ApiError } from '../utils/apiError.js';
 import { pick } from '../utils/pick.js';
 
+// Fields allowed for creation / update (including Phase‑8.3 extensions)
 const WORKOUT_FIELDS = [
   'workoutName',
   'description',
   'category',
   'duration',
   'schedule',
-  'exercises',
+  'exercises', // [{ name, sets, reps, weight, restInterval, completed? }]
   'status',
   'assignedMember',
   'assignedTrainer',
+  // Phase‑8.3 additional fields
+  'trainerNotes',
+  'memberFeedback',
 ];
 
+/** --------------------------------------------------------------
+ * GET /api/workouts – list workouts visible to the requester
+ */
 export const getWorkouts = async (req, res) => {
   const query = {};
 
-  // Role scoping
+  // Role‑based scoping
   if (req.user.role === 'member') {
     query.assignedMember = req.user.id;
   } else if (req.user.role === 'trainer') {
-    // If trainer specifically passed a memberId filter, allow viewing workouts of that member
+    // Trainer can view own workouts or filter by a specific member
     if (req.query.memberId) {
       query.assignedMember = req.query.memberId;
-    }
-    // By default, trainers see workouts assigned to them
-    if (req.query.all !== 'true') {
+    } else if (req.query.all !== 'true') {
       query.assignedTrainer = req.user.id;
     }
   } else if (req.user.role === 'admin') {
@@ -35,16 +41,16 @@ export const getWorkouts = async (req, res) => {
     if (req.query.trainerId) query.assignedTrainer = req.query.trainerId;
   }
 
-  // Common filters
-  if (req.query.status) {
-    query.status = req.query.status;
-  }
-  if (req.query.category) {
-    query.category = req.query.category;
-  }
+  // Additional optional filters
+  if (req.query.status) query.status = req.query.status;
+  if (req.query.category) query.category = req.query.category;
   if (req.query.search) {
-    const searchRegex = new RegExp(req.query.search, 'i');
-    query.$or = [{ workoutName: searchRegex }, { category: searchRegex }, { description: searchRegex }];
+    const regex = new RegExp(req.query.search, 'i');
+    query.$or = [
+      { workoutName: regex },
+      { category: regex },
+      { description: regex },
+    ];
   }
 
   const workouts = await Workout.find(query)
@@ -52,57 +58,56 @@ export const getWorkouts = async (req, res) => {
     .populate('assignedTrainer', 'fullName email phone profileImage')
     .sort({ createdAt: -1 });
 
-  res.status(200).json({
-    success: true,
-    count: workouts.length,
-    data: workouts,
-  });
+  res.status(200).json({ success: true, count: workouts.length, data: workouts });
 };
 
+/** --------------------------------------------------------------
+ * GET /api/workouts/:id – fetch single workout (access‑controlled)
+ */
 export const getWorkoutById = async (req, res) => {
   const workout = await Workout.findById(req.params.id)
     .populate('assignedMember', 'fullName email phone gender profileImage')
     .populate('assignedTrainer', 'fullName email phone profileImage');
 
-  if (!workout) {
-    throw new ApiError(404, 'Workout not found.');
-  }
+  if (!workout) throw new ApiError(404, 'Workout not found');
 
-  // Security check: members can only see their own workouts
-  if (req.user.role === 'member' && workout.assignedMember?._id?.toString() !== req.user.id) {
-    throw new ApiError(403, 'You do not have access to this workout.');
+  // Members may only view their own workouts
+  if (req.user.role === 'member' && workout.assignedMember?.toString() !== req.user.id) {
+    throw new ApiError(403, 'You do not have access to this workout');
   }
 
   res.status(200).json({ success: true, data: workout });
 };
 
+/** --------------------------------------------------------------
+ * POST /api/workouts – create a new workout (trainers & admin only)
+ */
 export const createWorkout = async (req, res) => {
-  // Members cannot create workouts (except during test-db script)
-  if (req.user.role === 'member' && !process.argv[1]?.includes('test-db.js')) {
-    throw new ApiError(403, 'Members are not permitted to create workouts.');
+  if (req.user.role === 'member') {
+    throw new ApiError(403, 'Members are not permitted to create workouts');
   }
 
   const body = pick(req.body, WORKOUT_FIELDS);
 
-  // If trainer creates, force assignedTrainer to themselves
-  if (req.user.role === 'trainer') {
-    body.assignedTrainer = req.user.id;
+  // Auto‑assign trainer when a trainer creates the workout
+  if (req.user.role === 'trainer') body.assignedTrainer = req.user.id;
+
+  // Validate required fields
+  const required = ['workoutName', 'description', 'category', 'duration', 'assignedMember', 'assignedTrainer'];
+  for (const f of required) {
+    if (!body[f]) throw new ApiError(400, `Missing required field: ${f}`);
   }
 
-  if (!body.workoutName || !body.description || !body.category || !body.duration || !body.assignedMember || !body.assignedTrainer) {
-    throw new ApiError(400, 'All required workout fields must be provided.');
-  }
-
-  // Verify member
+  // Verify member exists and has correct role
   const member = await User.findById(body.assignedMember);
   if (!member || member.role !== 'member') {
-    throw new ApiError(400, 'Assigned member must be an existing member.');
+    throw new ApiError(400, 'assignedMember must be an existing member');
   }
 
-  // Verify trainer
+  // Verify trainer exists and has correct role (admin may provide a trainer id)
   const trainer = await User.findById(body.assignedTrainer);
   if (!trainer || trainer.role !== 'trainer') {
-    throw new ApiError(400, 'Assigned trainer must be an existing trainer.');
+    throw new ApiError(400, 'assignedTrainer must be an existing trainer');
   }
 
   const workout = await Workout.create(body);
@@ -110,78 +115,107 @@ export const createWorkout = async (req, res) => {
     .populate('assignedMember', 'fullName email phone gender profileImage')
     .populate('assignedTrainer', 'fullName email phone profileImage');
 
-  res.status(201).json({
-    success: true,
-    message: 'Workout created and assigned successfully.',
-    data: populated,
-  });
+  res.status(201).json({ success: true, message: 'Workout created', data: populated });
 };
 
+/** --------------------------------------------------------------
+ * PATCH /api/workouts/:id – generic workout update (role‑aware)
+ */
 export const updateWorkout = async (req, res) => {
   const workout = await Workout.findById(req.params.id);
-  if (!workout) {
-    throw new ApiError(404, 'Workout not found.');
-  }
+  if (!workout) throw new ApiError(404, 'Workout not found');
 
-  // Role checks
+  // Role‑based access control
   if (req.user.role === 'member') {
-    if (workout.assignedMember.toString() !== req.user.id) {
-      throw new ApiError(403, 'You do not have permission to update this workout.');
+    if (workout.assignedMember?.toString() !== req.user.id) {
+      throw new ApiError(403, 'You cannot modify this workout');
     }
-    // Members can only update status
-    if (req.body.status) {
-      workout.status = req.body.status;
-      if (req.body.status === 'completed') {
-        workout.completedAt = new Date();
-      }
-    }
-    await workout.save();
+    // Members may only change status
+    if (req.body.status) workout.status = req.body.status;
   } else if (req.user.role === 'trainer') {
-    if (workout.assignedTrainer.toString() !== req.user.id) {
-      throw new ApiError(403, 'You can only update workouts assigned to you.');
+    if (workout.assignedTrainer?.toString() !== req.user.id) {
+      throw new ApiError(403, 'You can only update workouts assigned to you');
     }
-    Object.assign(workout, pick(req.body, ['workoutName', 'description', 'category', 'duration', 'schedule', 'exercises', 'status']));
-    if (req.body.status === 'completed') {
-      workout.completedAt = new Date();
-    }
-    await workout.save();
+    const updatable = ['workoutName', 'description', 'category', 'duration', 'schedule', 'exercises', 'status'];
+    Object.assign(workout, pick(req.body, updatable));
   } else if (req.user.role === 'admin') {
     Object.assign(workout, pick(req.body, WORKOUT_FIELDS));
-    if (req.body.status === 'completed' && !workout.completedAt) {
-      workout.completedAt = new Date();
-    }
-    await workout.save();
+  } else {
+    throw new ApiError(403, 'Unauthorized');
   }
+
+  if (workout.status === 'completed' && !workout.completedAt) {
+    workout.completedAt = new Date();
+  }
+
+  await workout.save();
 
   const populated = await Workout.findById(workout._id)
     .populate('assignedMember', 'fullName email phone gender profileImage')
     .populate('assignedTrainer', 'fullName email phone profileImage');
 
-  res.status(200).json({
-    success: true,
-    message: 'Workout updated successfully.',
-    data: populated,
-  });
+  res.status(200).json({ success: true, message: 'Workout updated', data: populated });
 };
 
+/** --------------------------------------------------------------
+ * PATCH /api/workouts/:id/exercises/:exerciseIdx – toggle exercise completion
+ */
+export const updateExerciseProgress = async (req, res) => {
+  const { id } = req.params; // workout id
+  const { exerciseIdx } = req.params; // index from route
+  const { completed } = req.body;
+
+  if (typeof completed !== 'boolean') {
+    throw new ApiError(400, 'completed flag must be boolean');
+  }
+
+  const workout = await Workout.findById(id);
+  if (!workout) throw new ApiError(404, 'Workout not found');
+
+  // Permission check
+  const isMember = req.user.role === 'member' && workout.assignedMember?.toString() === req.user.id;
+  const isTrainer = req.user.role === 'trainer' && workout.assignedTrainer?.toString() === req.user.id;
+  const isAdmin = req.user.role === 'admin';
+  if (!isMember && !isTrainer && !isAdmin) {
+    throw new ApiError(403, 'You do not have permission to modify this exercise');
+  }
+
+  const idx = parseInt(exerciseIdx, 10);
+  if (Number.isNaN(idx) || idx < 0 || idx >= (workout.exercises?.length || 0)) {
+    throw new ApiError(400, 'Invalid exercise index');
+  }
+
+  // Only members may toggle the completed flag
+  if (isMember) {
+    workout.exercises[idx].completed = completed;
+    await workout.save();
+  }
+
+  const populated = await Workout.findById(id)
+    .populate('assignedMember', 'fullName email phone gender profileImage')
+    .populate('assignedTrainer', 'fullName email phone profileImage');
+
+  res.status(200).json({ success: true, data: populated });
+};
+
+/** --------------------------------------------------------------
+ * PATCH /api/workouts/:id/status – explicit status change
+ */
 export const updateWorkoutStatus = async (req, res) => {
   const { status } = req.body;
-  if (!['assigned', 'in-progress', 'completed'].includes(status)) {
-    throw new ApiError(400, 'Status must be assigned, in-progress, or completed.');
+  const allowed = ['assigned', 'in-progress', 'completed'];
+  if (!allowed.includes(status)) {
+    throw new ApiError(400, 'Status must be assigned, in-progress, or completed');
   }
 
   const workout = await Workout.findById(req.params.id);
-  if (!workout) {
-    throw new ApiError(404, 'Workout not found.');
-  }
+  if (!workout) throw new ApiError(404, 'Workout not found');
 
-  // Verify access: must be assigned member, assigned trainer, or admin
-  const isMember = req.user.role === 'member' && workout.assignedMember.toString() === req.user.id;
-  const isTrainer = req.user.role === 'trainer' && workout.assignedTrainer.toString() === req.user.id;
+  const isMember = req.user.role === 'member' && workout.assignedMember?.toString() === req.user.id;
+  const isTrainer = req.user.role === 'trainer' && workout.assignedTrainer?.toString() === req.user.id;
   const isAdmin = req.user.role === 'admin';
-
   if (!isMember && !isTrainer && !isAdmin) {
-    throw new ApiError(403, 'You do not have permission to update this workout status.');
+    throw new ApiError(403, 'You do not have permission to update this workout status');
   }
 
   workout.status = status;
@@ -190,6 +224,7 @@ export const updateWorkoutStatus = async (req, res) => {
   } else if (status === 'assigned') {
     workout.completedAt = null;
   }
+
   await workout.save();
 
   const populated = await Workout.findById(workout._id)
@@ -198,31 +233,26 @@ export const updateWorkoutStatus = async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: `Workout status changed to ${status}.`,
+    message: `Workout status changed to ${status}`,
     data: populated,
   });
 };
 
+/** --------------------------------------------------------------
+ * DELETE /api/workouts/:id – remove a workout (trainer for own, admin any)
+ */
 export const deleteWorkout = async (req, res) => {
   const workout = await Workout.findById(req.params.id);
-  if (!workout) {
-    throw new ApiError(404, 'Workout not found.');
-  }
+  if (!workout) throw new ApiError(404, 'Workout not found');
 
-  // Members cannot delete workouts
   if (req.user.role === 'member') {
-    throw new ApiError(403, 'Members are not permitted to delete workouts.');
+    throw new ApiError(403, 'Members cannot delete workouts');
   }
 
-  // Trainers can only delete their own workouts
-  if (req.user.role === 'trainer' && workout.assignedTrainer.toString() !== req.user.id) {
-    throw new ApiError(403, 'You can only delete workouts assigned to you.');
+  if (req.user.role === 'trainer' && workout.assignedTrainer?.toString() !== req.user.id) {
+    throw new ApiError(403, 'Trainers can only delete their own workouts');
   }
 
   await Workout.findByIdAndDelete(req.params.id);
-
-  res.status(200).json({
-    success: true,
-    message: 'Workout deleted successfully.',
-  });
+  res.status(200).json({ success: true, message: 'Workout deleted successfully' });
 };

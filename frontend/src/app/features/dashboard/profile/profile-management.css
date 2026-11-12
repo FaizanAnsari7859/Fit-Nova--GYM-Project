@@ -97,6 +97,121 @@
   font-weight: 600;
 }
 
+.accent-highlight {
+  color: var(--color-accent);
+}
+
+.meta-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.meta-chip {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(255, 107, 0, 0.12);
+  border: 1px solid rgba(255, 107, 0, 0.3);
+  color: var(--color-accent);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.assigned-coach-box {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(255, 107, 0, 0.08);
+  border: 1px solid rgba(255, 107, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.coach-box-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.coach-icon {
+  font-size: 1rem;
+}
+
+.coach-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  letter-spacing: 0.5px;
+}
+
+.coach-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.coach-spec {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+}
+
+.form-divider {
+  border-bottom: 1px solid var(--color-line);
+  margin: 16px 0 8px;
+  padding-bottom: 8px;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.field-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.char-count {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.hint-text {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  margin-top: 4px;
+}
+
+textarea {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color var(--transition-fast);
+}
+
+textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+textarea.invalid {
+  border-color: var(--color-danger);
+}
+
 .forms-column {
   display: grid;
   gap: 24px;

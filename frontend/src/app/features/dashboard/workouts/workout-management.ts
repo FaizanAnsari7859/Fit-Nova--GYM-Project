@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
   FormArray,
   FormControl,
@@ -39,6 +40,8 @@ type ModalMode = 'add' | 'edit' | 'view' | 'delete' | null;
 export class WorkoutManagement implements OnInit {
   private readonly workoutService = inject(WorkoutService);
   private readonly userService = inject(UserService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   protected readonly authService = inject(AuthService);
 
   protected readonly loading = signal(true);
@@ -56,6 +59,8 @@ export class WorkoutManagement implements OnInit {
   protected readonly searchValue = signal('');
   protected readonly statusFilter = signal('');
   protected readonly categoryFilter = signal('');
+  protected readonly filteredMemberId = signal<string | null>(null);
+  protected readonly filteredMemberName = signal<string | null>(null);
 
   protected readonly userRole = this.authService.userRole;
   protected readonly currentUser = this.authService.currentUser;
@@ -113,19 +118,41 @@ export class WorkoutManagement implements OnInit {
   });
 
   ngOnInit(): void {
-    this.loadWorkouts();
     if (this.userRole() === 'admin' || this.userRole() === 'trainer') {
       this.loadUsers();
     }
+
+    this.route.queryParamMap.subscribe((params) => {
+      const mId = params.get('memberId');
+      const mName = params.get('memberName');
+      const action = params.get('action');
+
+      this.filteredMemberId.set(mId);
+      this.filteredMemberName.set(mName);
+
+      this.loadWorkouts();
+
+      if (action === 'assign') {
+        setTimeout(() => {
+          this.openAdd(mId || undefined);
+        }, 150);
+      }
+    });
   }
 
   protected loadWorkouts(): void {
     this.loading.set(true);
     this.error.set(null);
-    const filters = {
+    const filters: {
+      search?: string;
+      status?: string;
+      category?: string;
+      memberId?: string;
+    } = {
       search: this.searchValue(),
       status: this.statusFilter(),
       category: this.categoryFilter(),
+      memberId: this.filteredMemberId() || undefined,
     };
 
     this.workoutService.getWorkouts(filters).subscribe({
@@ -140,13 +167,24 @@ export class WorkoutManagement implements OnInit {
     });
   }
 
+  protected clearMemberFilter(): void {
+    this.filteredMemberId.set(null);
+    this.filteredMemberName.set(null);
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { memberId: null, memberName: null, action: null },
+      queryParamsHandling: 'merge',
+    });
+    this.loadWorkouts();
+  }
+
   protected loadUsers(): void {
     this.userService.getUsers().subscribe({
       next: (users) => {
         this.members.set(users.filter((u) => u.role === 'member'));
         this.trainers.set(users.filter((u) => u.role === 'trainer'));
       },
-      error: () => {},
+      error: () => { },
     });
   }
 
@@ -185,14 +223,14 @@ export class WorkoutManagement implements OnInit {
   }
 
   // Modals
-  protected openAdd(): void {
+  protected openAdd(preselectedMemberId?: string): void {
     this.workoutForm.reset({
       workoutName: '',
       description: '',
       category: 'Strength',
       duration: 45,
       schedule: 'Mon, Wed, Fri - 8:00 AM',
-      assignedMember: '',
+      assignedMember: preselectedMemberId || this.filteredMemberId() || '',
       assignedTrainer: this.userRole() === 'trainer' ? (this.currentUser()?._id ?? '') : '',
       status: 'assigned',
     });

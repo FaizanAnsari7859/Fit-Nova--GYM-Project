@@ -44,6 +44,18 @@
     <div class="alert alert-error">{{ error() }}</div>
   }
 
+  @if (filteredMemberId()) {
+    <div class="member-filter-banner">
+      <div class="member-filter-info">
+        <span class="member-filter-icon">👤</span>
+        <span>Viewing workout progress for: <strong>{{ filteredMemberName() || 'Selected Member' }}</strong></span>
+      </div>
+      <button type="button" class="btn btn-outline-accent btn-sm" (click)="clearMemberFilter()">
+        ✕ Clear Filter (Show All)
+      </button>
+    </div>
+  }
+
   <!-- Filters -->
   <div class="filters-bar">
     <input

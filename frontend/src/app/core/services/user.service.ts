@@ -14,11 +14,51 @@ export interface AdminStats {
   recentMembers: User[];
 }
 
+export interface AssignedMemberSummary {
+  _id: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  gender?: string;
+  profileImage?: string;
+  assignedDate: string;
+  assignedWorkoutsCount: number;
+  completedWorkoutsCount: number;
+  activeWorkoutsCount: number;
+  completionRate: number;
+}
+
+export interface TrainerActivityItem {
+  id: string;
+  type: 'member_assigned' | 'workout_assigned' | 'workout_completed';
+  title: string;
+  description: string;
+  timestamp: string;
+  metadata?: {
+    memberId?: string;
+    memberName?: string;
+    workoutId?: string;
+  };
+}
+
+export interface TrainerStatistics {
+  totalAssignedMembers: number;
+  activeWorkoutRoutines: number;
+  completedWorkoutSessions: number;
+  overallCompletionRate: number;
+  totalWorkouts: number;
+}
+
 export interface TrainerOverview {
   totalAssignedMembers: number;
   totalWorkouts: number;
-  assignedMembers: User[];
+  activeWorkoutRoutines: number;
+  completedWorkoutSessions: number;
+  overallCompletionRate: number;
+  statistics?: TrainerStatistics;
+  assignedMembers: AssignedMemberSummary[];
   workouts: WorkoutSummary[];
+  recentActivities: TrainerActivityItem[];
 }
 
 export interface MemberOverview {

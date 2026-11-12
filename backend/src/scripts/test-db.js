@@ -135,6 +135,10 @@ try {
   assert(loggedIn.data.data.role === 'member', 'Login did not return the member role.');
   assert(!loggedIn.raw.includes(password) && !loggedIn.data.data.password, 'Login response exposed password data.');
   const token = loggedIn.data.token;
+  // Log in the trainer to obtain a token for trainer-restricted actions
+  const trainerLogin = await api(baseUrl, 'POST', '/api/auth/login', { body: { email: trainerEmail, password } });
+  assert(trainerLogin.status === 200, `Trainer login failed: ${trainerLogin.raw}`);
+  const trainerToken = trainerLogin.data.token;
 
   const badLogin = await api(baseUrl, 'POST', '/api/auth/login', {
     body: { email: memberEmail, password: 'wrong-password' },
@@ -170,7 +174,7 @@ try {
   assert(memberships.status === 200 && memberships.data.data.some((item) => item._id === membership.data.data._id), 'Membership retrieval failed.');
 
   const workout = await api(baseUrl, 'POST', '/api/workouts', {
-    token,
+    token: trainerToken,
     body: {
       workoutName: 'Strength A',
       description: 'Full body strength session.',

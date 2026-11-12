@@ -31,6 +31,44 @@
           <span class="meta-label">Member Since:</span>
           <span class="meta-value">{{ currentUser()?.createdAt | date:'mediumDate' }}</span>
         </div>
+
+        @if (isTrainer()) {
+          @if (currentUser()?.specialization) {
+            <div class="meta-item">
+              <span class="meta-label">Specialization:</span>
+              <span class="meta-value accent-highlight">{{ currentUser()?.specialization }}</span>
+            </div>
+          }
+          @if (currentUser()?.experienceYears !== undefined) {
+            <div class="meta-item">
+              <span class="meta-label">Experience:</span>
+              <span class="meta-value">{{ currentUser()?.experienceYears }} yrs</span>
+            </div>
+          }
+          @if (currentUser()?.certifications?.length) {
+            <div class="meta-item">
+              <span class="meta-label">Certifications:</span>
+              <div class="meta-chips">
+                @for (c of currentUser()?.certifications; track c) {
+                  <span class="meta-chip">{{ c }}</span>
+                }
+              </div>
+            </div>
+          }
+        }
+
+        @if (isMember() && assignedTrainer(); as trainer) {
+          <div class="assigned-coach-box">
+            <div class="coach-box-header">
+              <span class="coach-icon">🏋️</span>
+              <span class="coach-tag">Assigned Coach</span>
+            </div>
+            <div class="coach-name">{{ trainer.fullName }}</div>
+            @if (trainer.specialization) {
+              <div class="coach-spec">{{ trainer.specialization }}</div>
+            }
+          </div>
+        }
       </div>
     </div>
 
@@ -80,6 +118,63 @@
               <label>Date of Birth</label>
               <input formControlName="dateOfBirth" type="date" />
             </div>
+
+            @if (isTrainer()) {
+              <div class="form-divider full-width">
+                <span>Trainer Professional Details</span>
+              </div>
+
+              <div class="form-field">
+                <label>Specialization</label>
+                <input
+                  formControlName="specialization"
+                  type="text"
+                  placeholder="e.g. Strength & Conditioning, HIIT, Yoga"
+                  maxlength="100"
+                />
+              </div>
+
+              <div class="form-field">
+                <label>Experience (Years)</label>
+                <input
+                  formControlName="experienceYears"
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  [class.invalid]="isProfileInvalid('experienceYears')"
+                />
+                @if (isProfileInvalid('experienceYears')) {
+                  <span class="error-text">Experience cannot be negative.</span>
+                }
+              </div>
+
+              <div class="form-field full-width">
+                <label>Certifications (comma-separated)</label>
+                <input
+                  formControlName="certificationsText"
+                  type="text"
+                  placeholder="e.g. NASM CPT, ACE Fitness, CrossFit Level 2"
+                />
+                <span class="hint-text">Separate each certification with a comma</span>
+              </div>
+
+              <div class="form-field full-width">
+                <div class="field-header-row">
+                  <label>Professional Bio</label>
+                  <span class="char-count">{{ profileForm.get('bio')?.value?.length || 0 }}/500</span>
+                </div>
+                <textarea
+                  formControlName="bio"
+                  rows="4"
+                  maxlength="500"
+                  placeholder="Tell your clients about your background, training philosophy, and achievements..."
+                  [class.invalid]="isProfileInvalid('bio')"
+                ></textarea>
+                @if (isProfileInvalid('bio')) {
+                  <span class="error-text">Bio must not exceed 500 characters.</span>
+                }
+              </div>
+            }
           </div>
 
           <div class="form-actions">

@@ -18,6 +18,7 @@ import {
 } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/services/auth.service';
+import { User } from '../../../core/models/auth.models';
 
 const passwordMatchValidator: ValidatorFn = (
   control: AbstractControl,
@@ -41,6 +42,17 @@ export class ProfileManagement implements OnInit {
   protected readonly authService = inject(AuthService);
 
   protected readonly currentUser = this.authService.currentUser;
+  protected readonly isTrainer = computed(() => this.currentUser()?.role === 'trainer');
+  protected readonly isMember = computed(() => this.currentUser()?.role === 'member');
+
+  protected readonly assignedTrainer = computed(() => {
+    const at = this.currentUser()?.assignedTrainer;
+    if (at && typeof at === 'object' && 'fullName' in at) {
+      return at as { _id: string; fullName: string; specialization?: string; email?: string };
+    }
+    return null;
+  });
+
   protected readonly savingProfile = signal(false);
   protected readonly changingPassword = signal(false);
 
@@ -60,7 +72,7 @@ export class ProfileManagement implements OnInit {
       .slice(0, 2);
   });
 
-  // Profile Form
+  // Profile Form (including trainer professional fields)
   protected readonly profileForm = new FormGroup({
     fullName: new FormControl('', {
       nonNullable: true,
@@ -82,6 +94,19 @@ export class ProfileManagement implements OnInit {
       validators: [Validators.required],
     }),
     dateOfBirth: new FormControl('', { nonNullable: true }),
+    specialization: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.maxLength(100)],
+    }),
+    experienceYears: new FormControl<number>(0, {
+      nonNullable: true,
+      validators: [Validators.min(0)],
+    }),
+    bio: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.maxLength(500)],
+    }),
+    certificationsText: new FormControl('', { nonNullable: true }),
   });
 
   // Password Form
@@ -106,16 +131,24 @@ export class ProfileManagement implements OnInit {
   ngOnInit(): void {
     const u = this.currentUser();
     if (u) {
-      const dob = u.dateOfBirth
-        ? new Date(u.dateOfBirth).toISOString().split('T')[0]
-        : '';
-      this.profileForm.patchValue({
-        fullName: u.fullName,
-        phone: u.phone,
-        gender: u.gender,
-        dateOfBirth: dob,
-      });
+      this.populateForm(u);
     }
+  }
+
+  private populateForm(u: User): void {
+    const dob = u.dateOfBirth
+      ? new Date(u.dateOfBirth).toISOString().split('T')[0]
+      : '';
+    this.profileForm.patchValue({
+      fullName: u.fullName ?? '',
+      phone: u.phone ?? '',
+      gender: u.gender ?? 'male',
+      dateOfBirth: dob,
+      specialization: u.specialization ?? '',
+      experienceYears: u.experienceYears ?? 0,
+      bio: u.bio ?? '',
+      certificationsText: (u.certifications ?? []).join(', '),
+    });
   }
 
   protected submitProfile(): void {
@@ -130,26 +163,50 @@ export class ProfileManagement implements OnInit {
     this.savingProfile.set(true);
     const val = this.profileForm.getRawValue();
 
-    this.authService
-      .updateProfile({
-        fullName: val.fullName,
-        phone: val.phone,
-        gender: val.gender,
-        dateOfBirth: val.dateOfBirth || undefined,
-      })
-      .subscribe({
-        next: () => {
-          this.savingProfile.set(false);
-          this.profileSuccess.set('Profile details updated successfully.');
-          setTimeout(() => this.profileSuccess.set(null), 4000);
-        },
-        error: (err: HttpErrorResponse) => {
-          this.savingProfile.set(false);
-          this.profileError.set(
-            err?.error?.message ?? 'Failed to update profile.',
-          );
-        },
-      });
+    const payload: {
+      fullName: string;
+      phone: string;
+      gender: 'male' | 'female' | 'other';
+      dateOfBirth?: string;
+      specialization?: string;
+      experienceYears?: number;
+      bio?: string;
+      certifications?: string[];
+    } = {
+      fullName: val.fullName,
+      phone: val.phone,
+      gender: val.gender,
+      dateOfBirth: val.dateOfBirth || undefined,
+    };
+
+    if (this.isTrainer()) {
+      payload.specialization = val.specialization.trim();
+      payload.experienceYears = Number(val.experienceYears) || 0;
+      payload.bio = val.bio.trim();
+      payload.certifications = val.certificationsText
+        ? val.certificationsText
+            .split(',')
+            .map((c) => c.trim())
+            .filter(Boolean)
+        : [];
+    }
+
+    this.authService.updateProfile(payload).subscribe({
+      next: (user) => {
+        this.savingProfile.set(false);
+        this.profileSuccess.set('Profile details updated successfully.');
+        if (user) {
+          this.populateForm(user);
+        }
+        setTimeout(() => this.profileSuccess.set(null), 4000);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.savingProfile.set(false);
+        this.profileError.set(
+          err?.error?.message ?? 'Failed to update profile.',
+        );
+      },
+    });
   }
 
   protected submitPassword(): void {

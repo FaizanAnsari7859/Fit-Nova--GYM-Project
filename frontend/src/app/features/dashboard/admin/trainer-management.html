@@ -1,0 +1,78 @@
+<div class="trainer-management">
+  <h2 class="section-title">Trainer Management</h2>
+
+  <!-- Loading / error states -->
+  @if (loading()) {
+    <div class="spinner-overlay"><div class="spinner-sm"></div> Loading trainers...</div>
+  } @else if (error()) {
+    <div class="alert alert-error">{{ error() }}</div>
+  } @else {
+    <!-- Trainers table -->
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Specialization</th>
+          <th>Experience (years)</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (trainer of trainers(); track trainer._id) {
+          <tr>
+            <td>{{ trainer.fullName }}</td>
+            <td>{{ trainer.specialization ?? '—' }}</td>
+            <td>{{ trainer.experienceYears ?? '—' }}</td>
+          </tr>
+        }
+        @if (trainers().length === 0) {
+          <tr><td colspan="3" class="empty-state">No trainers available.</td></tr>
+        }
+      </tbody>
+    </table>
+
+    <!-- Assign Trainer button -->
+    <button type="button" class="btn btn-accent" (click)="openAssign()">+ Assign Trainer</button>
+
+    <!-- Modal overlay -->
+    @if (showAssign()) {
+      <div class="modal-backdrop" (click)="closeAssign()"></div>
+      <div class="modal">
+        <div class="modal-header">
+          <h3 class="modal-title">Assign Trainer to Member</h3>
+          <button class="btn btn-ghost" (click)="closeAssign()">✕</button>
+        </div>
+        <div class="modal-body">
+          <form [formGroup]="assignForm" (ngSubmit)="assign()">
+            <label>Member</label>
+            <select formControlName="memberId" required>
+              <option value="" disabled selected>Select member</option>
+              @for (member of members(); track member._id) {
+                <option [value]="member._id">{{ member.fullName }} ({{ member.email }})</option>
+              }
+            </select>
+
+            <label>Trainer</label>
+            <select formControlName="trainerId" required>
+              <option value="" disabled selected>Select trainer</option>
+              @for (trainer of trainers(); track trainer._id) {
+                <option [value]="trainer._id">{{ trainer.fullName }}</option>
+              }
+            </select>
+
+            <div class="modal-actions">
+              <button type="button" class="btn btn-ghost" (click)="closeAssign()">Cancel</button>
+              <button type="submit" class="btn btn-primary" [disabled]="submitting() || assignForm.invalid">
+                @if (submitting()) { Assigning... } @else { Assign }
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    }
+
+
+    @if (success()) {
+      <div class="alert alert-success">{{ success() }}</div>
+    }
+  }
+</div>

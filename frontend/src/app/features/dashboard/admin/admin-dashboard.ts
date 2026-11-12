@@ -6,12 +6,12 @@ import {
   signal,
 } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { RouterLink, RouterOutlet } from '@angular/router';
 import { AdminStats, UserService } from '../../../core/services/user.service';
 
 @Component({
   selector: 'app-admin-dashboard',
-  imports: [CurrencyPipe, DatePipe, RouterLink],
+  imports: [CurrencyPipe, DatePipe, RouterLink, RouterOutlet],
   templateUrl: './admin-dashboard.html',
   styleUrl: './admin-dashboard.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

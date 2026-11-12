@@ -2,46 +2,173 @@
   <div class="topbar">
     <div>
       <div class="topbar-title">Trainer Dashboard</div>
-      <div class="topbar-breadcrumb">FitNova · Trainer · Overview</div>
+      <div class="topbar-breadcrumb">FitNova · Coaching · Performance Hub</div>
+    </div>
+    <div class="topbar-actions">
+      <button
+        type="button"
+        class="btn btn-accent btn-sm"
+        (click)="openQuickAssign()"
+        [disabled]="loading()"
+      >
+        <span>+ Assign Workout Routine</span>
+      </button>
     </div>
   </div>
 </div>
 
 <div class="page-content">
+  <!-- Notifications -->
+  @if (success()) {
+    <div class="alert alert-success animate-fade-in">{{ success() }}</div>
+  }
+
+  @if (error()) {
+    <div class="alert alert-error animate-fade-in">
+      <div class="alert-content">
+        <span>{{ error() }}</span>
+        <button type="button" class="btn btn-outline-accent btn-xs" (click)="loadOverview()">
+          Retry
+        </button>
+      </div>
+    </div>
+  }
+
   @if (loading()) {
     <div class="spinner-overlay">
       <div class="spinner-sm"></div>
-      Loading trainer data…
+      <span>Loading trainer analytics & roster…</span>
     </div>
-  } @else if (error()) {
-    <div class="alert alert-error">{{ error() }}</div>
   } @else if (overview()) {
-    <!-- Stat cards -->
+    <!-- 1. Trainer Dashboard Statistics -->
     <div class="stats-grid">
       <div class="stat-card accent">
-        <div class="stat-icon">👥</div>
+        <div class="stat-header">
+          <span class="stat-icon">👥</span>
+          <span class="stat-badge">Roster</span>
+        </div>
         <div class="stat-value">{{ overview()!.totalAssignedMembers }}</div>
-        <div class="stat-label">Assigned Members</div>
+        <div class="stat-label">Total Assigned Members</div>
+        <div class="stat-subtext">Active athletes coached</div>
       </div>
+
       <div class="stat-card">
-        <div class="stat-icon">📋</div>
-        <div class="stat-value">{{ overview()!.totalWorkouts }}</div>
-        <div class="stat-label">Assigned Workouts</div>
+        <div class="stat-header">
+          <span class="stat-icon">⚡</span>
+          <span class="stat-badge badge-active">Live</span>
+        </div>
+        <div class="stat-value">{{ overview()!.activeWorkoutRoutines }}</div>
+        <div class="stat-label">Active Workout Routines</div>
+        <div class="stat-subtext">Assigned or currently in progress</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span class="stat-icon">✅</span>
+          <span class="stat-badge badge-completed">Done</span>
+        </div>
+        <div class="stat-value">{{ overview()!.completedWorkoutSessions }}</div>
+        <div class="stat-label">Completed Sessions</div>
+        <div class="stat-subtext">Successfully finished workouts</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span class="stat-icon">📈</span>
+          <span class="stat-badge badge-rate">Success</span>
+        </div>
+        <div class="stat-value">{{ overview()!.overallCompletionRate }}%</div>
+        <div class="stat-label">Overall Completion Rate</div>
+        <div class="progress-bar-wrap">
+          <div
+            class="progress-bar-fill"
+            [style.width.%]="overview()!.overallCompletionRate"
+          ></div>
+        </div>
       </div>
     </div>
 
-    <!-- Assigned members -->
+    <!-- 2. Assigned Members Section -->
     <div class="section-card">
       <div class="section-card-header">
-        <h2 class="section-card-title">My Assigned Members</h2>
+        <div class="header-left">
+          <h2 class="section-card-title">My Assigned Members</h2>
+          <span class="counter-badge">{{ overview()!.assignedMembers.length }}</span>
+        </div>
       </div>
+
+      <!-- Search & Filters Toolbar -->
+      <div class="members-toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input
+            type="text"
+            class="search-input"
+            placeholder="Search member by name, email, phone..."
+            [value]="memberSearch()"
+            (input)="onSearchChange($event)"
+          />
+        </div>
+
+        <div class="filter-pills">
+          <button
+            type="button"
+            class="filter-pill"
+            [class.active]="memberFilter() === 'all'"
+            (click)="setMemberFilter('all')"
+          >
+            All Members
+          </button>
+          <button
+            type="button"
+            class="filter-pill"
+            [class.active]="memberFilter() === 'active'"
+            (click)="setMemberFilter('active')"
+          >
+            Active Routines
+          </button>
+          <button
+            type="button"
+            class="filter-pill"
+            [class.active]="memberFilter() === 'completed'"
+            (click)="setMemberFilter('completed')"
+          >
+            100% Completed
+          </button>
+          <button
+            type="button"
+            class="filter-pill"
+            [class.active]="memberFilter() === 'needs-workout'"
+            (click)="setMemberFilter('needs-workout')"
+          >
+            Needs Routine
+          </button>
+        </div>
+      </div>
+
+      <!-- Members Content -->
       @if (overview()!.assignedMembers.length === 0) {
         <div class="empty-state">
           <div class="empty-icon">👥</div>
-          <div class="empty-title">No members assigned yet</div>
-          <p style="color: var(--color-muted); font-size: 0.88rem;">
-            When workouts are assigned to you by an admin, members will appear here.
+          <div class="empty-title">No members assigned to your coaching roster yet</div>
+          <p class="empty-desc">
+            When administrators assign athletes to you or workouts are created, they will automatically appear here.
           </p>
+        </div>
+      } @else if (filteredMembers().length === 0) {
+        <div class="empty-state">
+          <div class="empty-icon">🔎</div>
+          <div class="empty-title">No matching members found</div>
+          <p class="empty-desc">
+            No member matched "{{ memberSearch() }}" with the selected filter.
+          </p>
+          <button
+            type="button"
+            class="btn btn-outline-accent btn-sm"
+            (click)="memberSearch.set(''); memberFilter.set('all')"
+          >
+            Reset Filters
+          </button>
         </div>
       } @else {
         <div class="data-table-wrapper">
@@ -49,26 +176,95 @@
             <thead>
               <tr>
                 <th>Member</th>
-                <th>Phone</th>
-                <th>Gender</th>
-                <th>Member Since</th>
+                <th>Assigned Since</th>
+                <th>Routines Breakdown</th>
+                <th>Completion Progress</th>
+                <th style="text-align: right;">Actions</th>
               </tr>
             </thead>
             <tbody>
-              @for (member of overview()!.assignedMembers; track member._id) {
+              @for (member of filteredMembers(); track member._id) {
                 <tr>
+                  <!-- Member Column -->
                   <td>
                     <div class="user-cell">
-                      <div class="user-cell-avatar">{{ getInitials(member.fullName) }}</div>
-                      <div>
+                      <div class="user-cell-avatar">
+                        @if (member.profileImage) {
+                          <img [src]="member.profileImage" [alt]="member.fullName" />
+                        } @else {
+                          {{ getInitials(member.fullName) }}
+                        }
+                      </div>
+                      <div class="user-cell-info">
                         <div class="user-cell-name">{{ member.fullName }}</div>
                         <div class="user-cell-email">{{ member.email }}</div>
+                        @if (member.phone) {
+                          <div class="user-cell-phone">📞 {{ member.phone }}</div>
+                        }
                       </div>
                     </div>
                   </td>
-                  <td>{{ member.phone }}</td>
-                  <td style="text-transform: capitalize;">{{ member.gender }}</td>
-                  <td>{{ member.createdAt | date:'mediumDate' }}</td>
+
+                  <!-- Assigned Since -->
+                  <td>
+                    <span class="date-text">{{ member.assignedDate | date:'mediumDate' }}</span>
+                  </td>
+
+                  <!-- Routines Breakdown -->
+                  <td>
+                    <div class="routines-breakdown">
+                      <span class="badge badge-assigned" title="Total Assigned">
+                        Total: {{ member.assignedWorkoutsCount }}
+                      </span>
+                      <span class="badge badge-active" title="In Progress or Assigned">
+                        Active: {{ member.activeWorkoutsCount }}
+                      </span>
+                      <span class="badge badge-completed" title="Completed">
+                        Done: {{ member.completedWorkoutsCount }}
+                      </span>
+                    </div>
+                  </td>
+
+                  <!-- Completion Progress -->
+                  <td>
+                    <div class="completion-cell">
+                      <div class="completion-header">
+                        <span class="completion-pct">{{ member.completionRate }}%</span>
+                        <span class="completion-ratio">
+                          {{ member.completedWorkoutsCount }}/{{ member.assignedWorkoutsCount }} done
+                        </span>
+                      </div>
+                      <div class="progress-bar-wrap sm">
+                        <div
+                          class="progress-bar-fill"
+                          [style.width.%]="member.completionRate"
+                          [class.full]="member.completionRate === 100"
+                        ></div>
+                      </div>
+                    </div>
+                  </td>
+
+                  <!-- Actions -->
+                  <td>
+                    <div class="table-actions">
+                      <button
+                        type="button"
+                        class="btn btn-outline-accent btn-xs"
+                        (click)="openQuickAssign(member._id)"
+                        title="Assign new workout routine to this member"
+                      >
+                        + Assign Workout
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-xs"
+                        (click)="viewMemberProgress(member)"
+                        title="View workout progress for this member"
+                      >
+                        View Progress →
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               }
             </tbody>
@@ -77,43 +273,283 @@
       }
     </div>
 
-    <!-- Workouts summary -->
+    <!-- 5. Recent Activity Feed -->
     <div class="section-card">
       <div class="section-card-header">
-        <h2 class="section-card-title">Assigned Workouts</h2>
+        <div class="header-left">
+          <h2 class="section-card-title">Recent Coaching Activity</h2>
+          <span class="counter-badge">{{ overview()!.recentActivities.length }}</span>
+        </div>
+
+        <div class="filter-pills sm">
+          <button
+            type="button"
+            class="filter-pill"
+            [class.active]="activityFilter() === 'all'"
+            (click)="setActivityFilter('all')"
+          >
+            All
+          </button>
+          <button
+            type="button"
+            class="filter-pill"
+            [class.active]="activityFilter() === 'workout_assigned'"
+            (click)="setActivityFilter('workout_assigned')"
+          >
+            Assigned Routines
+          </button>
+          <button
+            type="button"
+            class="filter-pill"
+            [class.active]="activityFilter() === 'workout_completed'"
+            (click)="setActivityFilter('workout_completed')"
+          >
+            Completed Sessions
+          </button>
+          <button
+            type="button"
+            class="filter-pill"
+            [class.active]="activityFilter() === 'member_assigned'"
+            (click)="setActivityFilter('member_assigned')"
+          >
+            Members Added
+          </button>
+        </div>
       </div>
-      @if (overview()!.workouts.length === 0) {
+
+      @if (filteredActivities().length === 0) {
         <div class="empty-state">
-          <div class="empty-icon">🏋️</div>
-          <div class="empty-title">No workouts assigned yet</div>
+          <div class="empty-icon">📋</div>
+          <div class="empty-title">No recent activity recorded</div>
+          <p class="empty-desc">
+            Activities such as assigned workouts, completed sessions, and roster assignments will appear here in real-time.
+          </p>
         </div>
       } @else {
-        <div class="data-table-wrapper">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Workout Name</th>
-                <th>Category</th>
-                <th>Duration (mins)</th>
-                <th>Member</th>
-                <th>Assigned Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (w of overview()!.workouts; track w._id) {
-                <tr>
-                  <td style="font-weight: 700;">{{ w.workoutName }}</td>
-                  <td><span class="badge badge-trainer">{{ w.category }}</span></td>
-                  <td>{{ w.duration }} min</td>
-                  <td>{{ w.assignedMember?.fullName ?? 'N/A' }}</td>
-                  <td>{{ w.createdAt | date:'mediumDate' }}</td>
-                </tr>
+        <div class="activity-feed">
+          @for (act of filteredActivities(); track act.id) {
+            <div class="activity-item" [class]="'activity-' + act.type">
+              <div class="activity-icon-col">
+                <div class="activity-icon-bubble">
+                  @if (act.type === 'workout_assigned') {
+                    🏋️
+                  } @else if (act.type === 'workout_completed') {
+                    ✅
+                  } @else {
+                    👥
+                  }
+                </div>
+              </div>
+
+              <div class="activity-content-col">
+                <div class="activity-header-row">
+                  <span class="activity-title">{{ act.title }}</span>
+                  <span class="activity-time">{{ act.timestamp | date:'medium' }}</span>
+                </div>
+                <div class="activity-desc">{{ act.description }}</div>
+              </div>
+
+              @if (act.metadata?.memberId) {
+                <div class="activity-action-col">
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    (click)="router.navigate(['/dashboard/workouts'], { queryParams: { memberId: act.metadata?.memberId, memberName: act.metadata?.memberName } })"
+                  >
+                    View →
+                  </button>
+                </div>
               }
-            </tbody>
-          </table>
+            </div>
+          }
         </div>
       }
     </div>
   }
 </div>
 
+<!-- 4. Quick Workout Assignment Modal -->
+@if (showAssignModal()) {
+  <div class="modal-backdrop" (click)="closeQuickAssign()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Assign Workout Routine</h3>
+          <div class="modal-subtitle">Directly assign a personalized fitness program to your client</div>
+        </div>
+        <button type="button" class="btn-close" (click)="closeQuickAssign()">✕</button>
+      </div>
+
+      @if (modalError()) {
+        <div class="alert alert-error">{{ modalError() }}</div>
+      }
+
+      <form [formGroup]="assignForm" (ngSubmit)="submitQuickAssign()">
+        <div class="modal-body form-grid">
+          <!-- Member Selection -->
+          <div class="form-field full-width">
+            <label>Select Member *</label>
+            <select formControlName="assignedMember" [class.invalid]="isFieldInvalid('assignedMember')">
+              <option value="" disabled>-- Select an assigned athlete --</option>
+              @for (m of overview()?.assignedMembers; track m._id) {
+                <option [value]="m._id">{{ m.fullName }} ({{ m.email }})</option>
+              }
+            </select>
+            @if (isFieldInvalid('assignedMember')) {
+              <span class="error-text">Please choose a valid member.</span>
+            }
+          </div>
+
+          <!-- Routine Name -->
+          <div class="form-field full-width">
+            <label>Workout Routine Name *</label>
+            <input
+              type="text"
+              formControlName="workoutName"
+              placeholder="e.g. Hypertrophy Upper Body A"
+              [class.invalid]="isFieldInvalid('workoutName')"
+            />
+            @if (isFieldInvalid('workoutName')) {
+              <span class="error-text">Workout name is required (max 80 characters).</span>
+            }
+          </div>
+
+          <!-- Category -->
+          <div class="form-field">
+            <label>Category *</label>
+            <select formControlName="category">
+              <option value="Strength">Strength</option>
+              <option value="Hypertrophy">Hypertrophy</option>
+              <option value="Cardio">Cardio</option>
+              <option value="HIIT">HIIT</option>
+              <option value="CrossFit">CrossFit</option>
+              <option value="Flexibility">Flexibility & Mobility</option>
+              <option value="Endurance">Endurance</option>
+            </select>
+          </div>
+
+          <!-- Duration -->
+          <div class="form-field">
+            <label>Duration (Minutes) *</label>
+            <input
+              type="number"
+              formControlName="duration"
+              min="1"
+              [class.invalid]="isFieldInvalid('duration')"
+            />
+            @if (isFieldInvalid('duration')) {
+              <span class="error-text">Duration must be at least 1 minute.</span>
+            }
+          </div>
+
+          <!-- Schedule -->
+          <div class="form-field full-width">
+            <label>Target Schedule / Frequency</label>
+            <input
+              type="text"
+              formControlName="schedule"
+              placeholder="e.g. Mon, Wed, Fri - 8:00 AM"
+            />
+          </div>
+
+          <!-- Description -->
+          <div class="form-field full-width">
+            <label>Routine Instructions & Guidelines *</label>
+            <textarea
+              formControlName="description"
+              rows="3"
+              placeholder="Provide warmup instructions, rest intervals, and coaching cues..."
+              [class.invalid]="isFieldInvalid('description')"
+            ></textarea>
+            @if (isFieldInvalid('description')) {
+              <span class="error-text">Description is required (max 1000 characters).</span>
+            }
+          </div>
+
+          <!-- Exercises Dynamic List -->
+          <div class="exercises-section full-width">
+            <div class="exercises-header">
+              <label class="exercises-label">Exercise Movements</label>
+              <button
+                type="button"
+                class="btn btn-outline-accent btn-xs"
+                (click)="addExercise()"
+              >
+                + Add Movement
+              </button>
+            </div>
+
+            <div class="exercises-list" formArrayName="exercises">
+              @for (exGroup of exerciseFormArray.controls; track $index) {
+                <div class="exercise-item-row" [formGroupName]="$index">
+                  <div class="ex-col ex-name">
+                    <input
+                      type="text"
+                      formControlName="name"
+                      placeholder="Movement Name (e.g. Squat)"
+                    />
+                  </div>
+                  <div class="ex-col ex-sets">
+                    <input
+                      type="number"
+                      formControlName="sets"
+                      min="1"
+                      placeholder="Sets"
+                    />
+                  </div>
+                  <div class="ex-col ex-reps">
+                    <input
+                      type="number"
+                      formControlName="reps"
+                      min="1"
+                      placeholder="Reps"
+                    />
+                  </div>
+                  <div class="ex-col ex-weight">
+                    <input
+                      type="text"
+                      formControlName="weight"
+                      placeholder="Weight / Load (e.g. 60 kg)"
+                    />
+                  </div>
+                  <div class="ex-col ex-remove">
+                    <button
+                      type="button"
+                      class="btn-remove-ex"
+                      (click)="removeExercise($index)"
+                      title="Remove exercise"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            (click)="closeQuickAssign()"
+            [disabled]="submittingWorkout()"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="btn btn-accent btn-sm"
+            [disabled]="submittingWorkout()"
+          >
+            @if (submittingWorkout()) {
+              Assigning Routine…
+            } @else {
+              Assign Routine
+            }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

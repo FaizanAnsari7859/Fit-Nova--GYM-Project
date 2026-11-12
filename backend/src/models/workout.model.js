@@ -23,6 +23,17 @@ const exerciseSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    // New field: rest interval (seconds) for the exercise
+    restInterval: {
+      type: Number,
+      default: 60,
+      min: 0,
+    },
+    // Track individual exercise completion by member
+    completed: {
+      type: Boolean,
+      default: false,
+    },
   },
   { _id: false },
 );
@@ -58,6 +69,17 @@ const workoutSchema = new mongoose.Schema(
       trim: true,
       default: '',
       maxlength: [100, 'Schedule must be 100 characters or fewer.'],
+    },
+    // New fields for Phase 8.3
+    trainerNotes: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    memberFeedback: {
+      type: String,
+      trim: true,
+      default: '',
     },
     exercises: {
       type: [exerciseSchema],

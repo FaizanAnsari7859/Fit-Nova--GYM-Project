@@ -5,17 +5,62 @@
       <h2>Coaches who stay on the floor with you.</h2>
       <p>Meet the FitNova team. Each coach owns a specialty and shares the same standard.</p>
     </div>
-    <div class="grid">
-      @for (trainer of trainers; track trainer.name) {
-        <article>
-          <img [src]="trainer.image" [alt]="trainer.alt" />
-          <div class="meta">
-            <h3>{{ trainer.name }}</h3>
-            <p>{{ trainer.specialization }}</p>
-            <span>{{ trainer.experience }} experience</span>
-          </div>
-        </article>
-      }
-    </div>
+
+    <!-- Loading State -->
+    @if (loading()) {
+      <div class="trainers-feedback loading">
+        <div class="spinner"></div>
+        <p>Loading our certified coaches…</p>
+      </div>
+    }
+
+    <!-- Error State -->
+    @else if (error()) {
+      <div class="trainers-feedback error">
+        <p>{{ error() }}</p>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="loadTrainers()">Retry</button>
+      </div>
+    }
+
+    <!-- Empty State -->
+    @else if (trainers().length === 0) {
+      <div class="trainers-feedback empty">
+        <div class="empty-icon">🏋️</div>
+        <h3>No Coaches Registered Yet</h3>
+        <p>Our training roster is being updated. Check back soon!</p>
+      </div>
+    }
+
+    <!-- Trainers Grid -->
+    @else {
+      <div class="grid">
+        @for (trainer of trainers(); track trainer._id; let i = $index) {
+          <article>
+            <div class="trainer-img-wrap">
+              <img [src]="getTrainerImage(trainer, i)" [alt]="'Coach ' + trainer.fullName" />
+              @if (trainer.experienceYears) {
+                <span class="exp-badge">{{ trainer.experienceYears }}+ Years Exp</span>
+              }
+            </div>
+            <div class="meta">
+              <h3>{{ trainer.fullName }}</h3>
+              <p class="specialization">{{ trainer.specialization || 'Personal Trainer' }}</p>
+
+              @if (trainer.bio) {
+                <p class="bio">{{ trainer.bio }}</p>
+              }
+
+              @if (trainer.certifications && trainer.certifications.length > 0) {
+                <div class="certs-list">
+                  @for (cert of trainer.certifications; track cert) {
+                    <span class="cert-pill">{{ cert }}</span>
+                  }
+                </div>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    }
   </div>
 </section>

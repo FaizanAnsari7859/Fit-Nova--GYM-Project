@@ -10,8 +10,24 @@ export interface User {
   dateOfBirth: string;
   role: UserRole;
   profileImage?: string;
+  specialization?: string;
+  experienceYears?: number;
+  bio?: string;
+  certifications?: string[];
+  assignedTrainer?: User | string | null;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface PublicTrainer {
+  _id: string;
+  fullName: string;
+  specialization?: string;
+  experienceYears?: number;
+  bio?: string;
+  certifications?: string[];
+  profileImage?: string;
+  createdAt?: string;
 }
 
 export interface LoginPayload {

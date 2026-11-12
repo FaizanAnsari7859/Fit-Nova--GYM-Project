@@ -7,10 +7,23 @@ import { ApiError } from '../utils/apiError.js';
 import { pick } from '../utils/pick.js';
 import { toPublicUser, validateRegistration } from '../utils/validators.js';
 
-const UPDATABLE_FIELDS = ['fullName', 'email', 'phone', 'gender', 'dateOfBirth', 'role', 'profileImage'];
+const UPDATABLE_FIELDS = [
+  'fullName',
+  'email',
+  'phone',
+  'gender',
+  'dateOfBirth',
+  'role',
+  'profileImage',
+  'specialization',
+  'experienceYears',
+  'bio',
+  'certifications',
+  'assignedTrainer',
+];
 
 export const getMe = async (req, res) => {
-  const user = await User.findById(req.user.id);
+  const user = await User.findById(req.user.id).populate('assignedTrainer', 'fullName specialization profileImage');
 
   if (!user) {
     throw new ApiError(404, 'User not found.');
@@ -28,6 +41,47 @@ export const updateMe = async (req, res) => {
 
   const allowedSelfFields = ['fullName', 'email', 'phone', 'gender', 'dateOfBirth', 'profileImage'];
   Object.assign(user, pick(req.body, allowedSelfFields));
+
+  // Trainer professional fields
+  const trainerFields = ['specialization', 'experienceYears', 'bio', 'certifications'];
+  const hasTrainerFields = trainerFields.some((f) => req.body[f] !== undefined);
+
+  if (hasTrainerFields) {
+    if (user.role !== 'trainer') {
+      throw new ApiError(403, 'Only trainers are permitted to update trainer profile fields.');
+    }
+
+    if (req.body.specialization !== undefined) {
+      user.specialization = String(req.body.specialization || '').trim();
+    }
+
+    if (req.body.experienceYears !== undefined) {
+      const exp = Number(req.body.experienceYears);
+      if (Number.isNaN(exp) || exp < 0) {
+        throw new ApiError(400, 'Experience years must be a number greater than or equal to 0.');
+      }
+      user.experienceYears = exp;
+    }
+
+    if (req.body.bio !== undefined) {
+      const bioStr = String(req.body.bio || '').trim();
+      if (bioStr.length > 500) {
+        throw new ApiError(400, 'Bio must be 500 characters or fewer.');
+      }
+      user.bio = bioStr;
+    }
+
+    if (req.body.certifications !== undefined) {
+      let certs = req.body.certifications;
+      if (typeof certs === 'string') {
+        certs = certs.split(',').map((c) => c.trim()).filter(Boolean);
+      }
+      if (!Array.isArray(certs) || certs.some((c) => typeof c !== 'string')) {
+        throw new ApiError(400, 'Certifications must be an array of strings.');
+      }
+      user.certifications = certs.map((c) => c.trim()).filter(Boolean);
+    }
+  }
 
   if (req.body.currentPassword && req.body.newPassword) {
     const isMatch = await bcrypt.compare(req.body.currentPassword, user.password);
@@ -193,29 +247,160 @@ export const getAdminStats = async (req, res) => {
 };
 
 export const getTrainerOverview = async (req, res) => {
-  const trainerId = req.user.id;
+  const trainerId =
+    req.user.role === 'admin' && req.query.trainerId
+      ? req.query.trainerId
+      : req.user.id;
 
+  // 1. Fetch directly assigned members from User collection
+  const assignedMembersFromUser = await User.find({
+    role: 'member',
+    assignedTrainer: trainerId,
+    isActive: { $ne: false },
+  }).select('_id fullName email phone gender profileImage createdAt updatedAt');
+
+  // 2. Fetch all workouts assigned by this trainer
   const workouts = await Workout.find({ assignedTrainer: trainerId })
-    .populate('assignedMember', 'fullName email phone gender profileImage')
+    .populate('assignedMember', '_id fullName email phone gender profileImage')
     .sort({ createdAt: -1 });
 
-  // Extract distinct assigned members
+  // 3. Build a distinct map of all members associated with this trainer
   const memberMap = new Map();
-  workouts.forEach((w) => {
-    if (w.assignedMember && w.assignedMember._id) {
-      memberMap.set(w.assignedMember._id.toString(), w.assignedMember);
+
+  for (const m of assignedMembersFromUser) {
+    memberMap.set(m._id.toString(), {
+      _id: m._id,
+      fullName: m.fullName,
+      email: m.email,
+      phone: m.phone || '',
+      gender: m.gender || '',
+      profileImage: m.profileImage || '',
+      assignedDate: m.updatedAt || m.createdAt,
+      assignedWorkoutsCount: 0,
+      completedWorkoutsCount: 0,
+      activeWorkoutsCount: 0,
+      completionRate: 0,
+    });
+  }
+
+  let activeWorkoutRoutines = 0;
+  let completedWorkoutSessions = 0;
+
+  for (const w of workouts) {
+    if (w.status === 'completed') {
+      completedWorkoutSessions++;
+    } else {
+      activeWorkoutRoutines++;
     }
+
+    if (w.assignedMember && w.assignedMember._id) {
+      const mId = w.assignedMember._id.toString();
+      if (!memberMap.has(mId)) {
+        memberMap.set(mId, {
+          _id: w.assignedMember._id,
+          fullName: w.assignedMember.fullName,
+          email: w.assignedMember.email,
+          phone: w.assignedMember.phone || '',
+          gender: w.assignedMember.gender || '',
+          profileImage: w.assignedMember.profileImage || '',
+          assignedDate: w.createdAt,
+          assignedWorkoutsCount: 0,
+          completedWorkoutsCount: 0,
+          activeWorkoutsCount: 0,
+          completionRate: 0,
+        });
+      }
+
+      const m = memberMap.get(mId);
+      m.assignedWorkoutsCount++;
+      if (w.status === 'completed') {
+        m.completedWorkoutsCount++;
+      } else {
+        m.activeWorkoutsCount++;
+      }
+    }
+  }
+
+  // Calculate per-member completion percentage
+  const assignedMembers = Array.from(memberMap.values()).map((m) => {
+    m.completionRate =
+      m.assignedWorkoutsCount > 0
+        ? Math.round((m.completedWorkoutsCount / m.assignedWorkoutsCount) * 100)
+        : 0;
+    return m;
   });
 
-  const assignedMembers = Array.from(memberMap.values());
+  const totalWorkouts = workouts.length;
+  const overallCompletionRate =
+    totalWorkouts > 0
+      ? Math.round((completedWorkoutSessions / totalWorkouts) * 100)
+      : 0;
+
+  // 4. Build recent activities feed from real database records
+  const activities = [];
+
+  // Member assignment activities
+  for (const m of assignedMembersFromUser.slice(0, 5)) {
+    activities.push({
+      id: `assign_${m._id}`,
+      type: 'member_assigned',
+      title: 'New Member Assigned',
+      description: `${m.fullName} was assigned to your coaching roster.`,
+      timestamp: m.updatedAt || m.createdAt,
+      metadata: { memberId: m._id, memberName: m.fullName },
+    });
+  }
+
+  // Workout assignment activities
+  for (const w of workouts.slice(0, 5)) {
+    activities.push({
+      id: `workout_${w._id}`,
+      type: 'workout_assigned',
+      title: 'Workout Routine Assigned',
+      description: `Assigned "${w.workoutName}" (${w.category}, ${w.duration} min) to ${w.assignedMember?.fullName || 'Member'}.`,
+      timestamp: w.createdAt,
+      metadata: { workoutId: w._id, memberName: w.assignedMember?.fullName },
+    });
+  }
+
+  // Completed workout activities
+  const completedWorkouts = workouts
+    .filter((w) => w.status === 'completed' && w.completedAt)
+    .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
+    .slice(0, 5);
+
+  for (const cw of completedWorkouts) {
+    activities.push({
+      id: `complete_${cw._id}`,
+      type: 'workout_completed',
+      title: 'Workout Completed',
+      description: `${cw.assignedMember?.fullName || 'Member'} finished "${cw.workoutName}".`,
+      timestamp: cw.completedAt,
+      metadata: { workoutId: cw._id, memberName: cw.assignedMember?.fullName },
+    });
+  }
+
+  activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  const recentActivities = activities.slice(0, 10);
 
   res.status(200).json({
     success: true,
     data: {
       totalAssignedMembers: assignedMembers.length,
-      totalWorkouts: workouts.length,
+      totalWorkouts,
+      activeWorkoutRoutines,
+      completedWorkoutSessions,
+      overallCompletionRate,
+      statistics: {
+        totalAssignedMembers: assignedMembers.length,
+        activeWorkoutRoutines,
+        completedWorkoutSessions,
+        overallCompletionRate,
+        totalWorkouts,
+      },
       assignedMembers,
       workouts,
+      recentActivities,
     },
   });
 };

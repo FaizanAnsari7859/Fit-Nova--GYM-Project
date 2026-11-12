@@ -62,6 +62,10 @@ export class AuthService {
     gender?: string;
     dateOfBirth?: string;
     profileImage?: string;
+    specialization?: string;
+    experienceYears?: number;
+    bio?: string;
+    certifications?: string[];
     currentPassword?: string;
     newPassword?: string;
   }): Observable<User> {

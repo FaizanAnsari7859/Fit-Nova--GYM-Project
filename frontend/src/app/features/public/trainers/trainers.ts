@@ -1,12 +1,6 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
-
-interface TrainerCard {
-  name: string;
-  specialization: string;
-  experience: string;
-  image: string;
-  alt: string;
-}
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { TrainerService } from '../../../core/services/trainer.service';
+import { PublicTrainer } from '../../../core/models/auth.models';
 
 @Component({
   selector: 'app-trainers',
@@ -14,35 +8,43 @@ interface TrainerCard {
   styleUrl: './trainers.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class Trainers {
-  protected readonly trainers: TrainerCard[] = [
-    {
-      name: 'Aria Shah',
-      specialization: 'Strength & powerlifting',
-      experience: '8 years',
-      image: '/images/trainer-2.jpg',
-      alt: 'Coach Aria Shah on the training floor',
-    },
-    {
-      name: 'Leo Martins',
-      specialization: 'Athletic conditioning',
-      experience: '6 years',
-      image: '/images/trainer-1.jpg',
-      alt: 'Coach Leo Martins demonstrating a lift',
-    },
-    {
-      name: 'Maya Chen',
-      specialization: 'Yoga & mobility',
-      experience: '10 years',
-      image: '/images/trainer-3.jpg',
-      alt: 'Coach Maya Chen leading a mobility session',
-    },
-    {
-      name: 'Jordan Hale',
-      specialization: 'Nutrition coaching',
-      experience: '7 years',
-      image: '/images/trainer-4.jpg',
-      alt: 'Coach Jordan Hale during a training session',
-    },
-  ];
+export class Trainers implements OnInit {
+  private readonly trainerService = inject(TrainerService);
+
+  protected readonly loading = signal(true);
+  protected readonly error = signal<string | null>(null);
+  protected readonly trainers = signal<PublicTrainer[]>([]);
+
+  ngOnInit(): void {
+    this.loadTrainers();
+  }
+
+  protected loadTrainers(): void {
+    this.loading.set(true);
+    this.error.set(null);
+
+    this.trainerService.getPublicTrainers().subscribe({
+      next: (data) => {
+        this.trainers.set(data);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.error.set('Failed to load coaches. Please try again later.');
+        this.loading.set(false);
+      },
+    });
+  }
+
+  protected getTrainerImage(trainer: PublicTrainer, index: number): string {
+    if (trainer.profileImage && trainer.profileImage.trim().length > 0) {
+      return trainer.profileImage;
+    }
+    const defaultImages = [
+      '/images/trainer-2.jpg',
+      '/images/trainer-1.jpg',
+      '/images/trainer-3.jpg',
+      '/images/trainer-4.jpg',
+    ];
+    return defaultImages[index % defaultImages.length];
+  }
 }
