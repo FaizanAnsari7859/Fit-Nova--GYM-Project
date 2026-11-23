@@ -5,6 +5,7 @@ import {
   getAdminStats,
   getMe,
   getMemberOverview,
+  getTrainerAssignmentsOverview,
   getTrainerOverview,
   getUserById,
   getUsers,
@@ -25,6 +26,7 @@ router.patch('/me', asyncHandler(updateMe));
 
 // Dashboards & overview endpoints
 router.get('/admin/stats', requireRole('admin'), asyncHandler(getAdminStats));
+router.get('/admin/trainer-assignments', requireRole('admin'), asyncHandler(getTrainerAssignmentsOverview));
 router.get('/trainer/overview', requireRole('trainer', 'admin'), asyncHandler(getTrainerOverview));
 router.get('/member/overview', requireRole('member'), asyncHandler(getMemberOverview));
 

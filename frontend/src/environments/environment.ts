@@ -1,5 +1,5 @@
 export const environment = {
   production: true,
-  apiUrl: 'http://localhost:5000/api',
+  apiUrl: (typeof window !== 'undefined' && (window as any).__FITNOVA_API_URL__) || '/api',
 };
 

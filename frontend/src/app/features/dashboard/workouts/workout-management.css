@@ -224,6 +224,18 @@
   width: min(720px, 100%);
 }
 
+.workout-modal .form-field select {
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+
+.workout-modal .form-field select option {
+  background: #181818;
+  color: #ffffff;
+  padding: 8px;
+}
+
 .exercises-form-list {
   display: grid;
   gap: 8px;

@@ -1,9 +1,12 @@
 import bcrypt from 'bcryptjs';
+import Attendance from '../models/attendance.model.js';
 import Membership from '../models/membership.model.js';
 import Payment from '../models/payment.model.js';
+import Subscription from '../models/subscription.model.js';
 import User from '../models/user.model.js';
 import Workout from '../models/workout.model.js';
 import { ApiError } from '../utils/apiError.js';
+import { computeMembershipExpiry } from '../utils/membershipUtils.js';
 import { pick } from '../utils/pick.js';
 import { toPublicUser, validateRegistration } from '../utils/validators.js';
 
@@ -83,7 +86,11 @@ export const updateMe = async (req, res) => {
     }
   }
 
-  if (req.body.currentPassword && req.body.newPassword) {
+  // Password change requires current password verification (S18 fix)
+  if (req.body.newPassword) {
+    if (!req.body.currentPassword) {
+      throw new ApiError(400, 'currentPassword is required to change your password.');
+    }
     const isMatch = await bcrypt.compare(req.body.currentPassword, user.password);
     if (!isMatch) {
       throw new ApiError(400, 'Current password is incorrect.');
@@ -92,11 +99,8 @@ export const updateMe = async (req, res) => {
       throw new ApiError(400, 'New password must be at least 8 characters.');
     }
     user.password = req.body.newPassword;
-  } else if (req.body.password) {
-    if (String(req.body.password).length < 8) {
-      throw new ApiError(400, 'Password must be at least 8 characters.');
-    }
-    user.password = req.body.password;
+  } else if (req.body.currentPassword) {
+    // currentPassword supplied without newPassword — no-op, ignore silently
   }
 
   await user.save();
@@ -128,17 +132,36 @@ export const getUsers = async (req, res) => {
     ];
   }
 
-  const users = await User.find(filter).sort({ createdAt: -1 });
+  const query = User.find(filter)
+    .populate('assignedTrainer', 'fullName email specialization')
+    .sort({ createdAt: -1 });
+
+  let page = null;
+  let limit = null;
+  let total = null;
+  let totalPages = null;
+
+  if (req.query.page || req.query.limit) {
+    page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    limit = Math.max(1, parseInt(req.query.limit, 10) || 10);
+    total = await User.countDocuments(filter);
+    totalPages = Math.ceil(total / limit) || 1;
+    query.skip((page - 1) * limit).limit(limit);
+  }
+
+  const users = await query;
 
   res.status(200).json({
     success: true,
     count: users.length,
+    ...(total !== null ? { total, page, totalPages, limit } : {}),
     data: users.map(toPublicUser),
   });
 };
 
 export const getUserById = async (req, res) => {
-  const user = await User.findById(req.params.id);
+  const user = await User.findById(req.params.id)
+    .populate('assignedTrainer', 'fullName email specialization profileImage');
 
   if (!user) {
     throw new ApiError(404, 'User not found.');
@@ -163,6 +186,22 @@ export const createUser = async (req, res) => {
     throw new ApiError(400, errors[0], errors);
   }
 
+  if (req.body.specialization !== undefined) {
+    value.specialization = String(req.body.specialization).trim();
+  }
+  if (req.body.experienceYears !== undefined && req.body.experienceYears !== '') {
+    const exp = Number(req.body.experienceYears);
+    if (!Number.isNaN(exp) && exp >= 0) {
+      value.experienceYears = exp;
+    }
+  }
+  if (req.body.bio !== undefined) {
+    value.bio = String(req.body.bio).trim();
+  }
+  if (req.body.assignedTrainer) {
+    value.assignedTrainer = req.body.assignedTrainer;
+  }
+
   const user = await User.create(value);
 
   res.status(201).json({
@@ -179,7 +218,18 @@ export const updateUser = async (req, res) => {
     throw new ApiError(404, 'User not found.');
   }
 
-  Object.assign(user, pick(req.body, UPDATABLE_FIELDS));
+  // Prevent an admin from altering or demoting their own role
+  if (req.user.id === user.id && req.body.role && req.body.role !== user.role) {
+    throw new ApiError(400, 'Admins cannot change their own role.');
+  }
+
+  const updates = pick(req.body, UPDATABLE_FIELDS);
+
+  if (updates.assignedTrainer === '' || updates.assignedTrainer === null) {
+    updates.assignedTrainer = null;
+  }
+
+  Object.assign(user, updates);
 
   if (req.body.password) {
     if (String(req.body.password).length < 8) {
@@ -215,23 +265,111 @@ export const deleteUser = async (req, res) => {
 };
 
 export const getAdminStats = async (req, res) => {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+
   const [
     totalMembers,
     totalTrainers,
-    activeMemberships,
-    totalPayments,
+    activePlans,
+    inactivePlans,
     paymentsAgg,
     recentMembers,
+    recentPayments,
+    recentAttendance,
+    todayAttendance,
+    paidPayments,
+    allSubscriptions,
   ] = await Promise.all([
     User.countDocuments({ role: 'member' }),
     User.countDocuments({ role: 'trainer' }),
     Membership.countDocuments({ status: 'active' }),
-    Payment.countDocuments(),
-    Payment.aggregate([{ $group: { _id: null, totalRevenue: { $sum: '$amount' } } }]),
+    Membership.countDocuments({ status: 'inactive' }),
+    Payment.aggregate([
+      {
+        $group: {
+          _id: '$paymentStatus',
+          totalAmount: { $sum: '$amount' },
+          count: { $sum: 1 },
+        },
+      },
+    ]),
     User.find({ role: 'member' }).sort({ createdAt: -1 }).limit(5),
+    Payment.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('member', 'fullName email')
+      .populate('membership', 'planName price'),
+    Attendance.find()
+      .sort({ checkInTime: -1 })
+      .limit(5)
+      .populate('member', 'fullName email'),
+    Attendance.countDocuments({
+      checkInTime: { $gte: startOfToday, $lte: endOfToday },
+    }),
+    Payment.find({ paymentStatus: 'paid' })
+      .populate('membership', 'duration')
+      .populate('subscription')
+      .sort({ paymentDate: -1 }),
+    Subscription.find()
+      .populate('membershipPlan', 'duration')
+      .sort({ endDate: -1 }),
   ]);
 
-  const totalRevenue = paymentsAgg[0]?.totalRevenue || 0;
+  let totalRevenue = 0;
+  let totalPayments = 0;
+  let pendingPayments = 0;
+  let pendingRevenue = 0;
+
+  for (const item of paymentsAgg) {
+    totalPayments += item.count;
+    if (item._id === 'paid') {
+      totalRevenue = item.totalAmount;
+    } else if (item._id === 'pending') {
+      pendingPayments = item.count;
+      pendingRevenue = item.totalAmount;
+    }
+  }
+
+  // Calculate active memberships vs expired memberships based on members' latest payment / subscription
+  const memberLatestPayment = new Map();
+  for (const p of paidPayments) {
+    const mId = p.member?.toString();
+    if (!mId) continue;
+    const info = computeMembershipExpiry(p);
+    if (!info) continue;
+
+    const existing = memberLatestPayment.get(mId);
+    if (!existing || info.expiryDate.getTime() > existing.info.expiryDate.getTime()) {
+      memberLatestPayment.set(mId, { payment: p, info });
+    }
+  }
+
+  // Factor in dedicated Subscription records
+  for (const s of allSubscriptions) {
+    const mId = s.member?.toString();
+    if (!mId) continue;
+    const info = computeMembershipExpiry(null, s);
+    if (!info) continue;
+
+    const existing = memberLatestPayment.get(mId);
+    if (!existing || info.expiryDate.getTime() > existing.info.expiryDate.getTime()) {
+      memberLatestPayment.set(mId, { subscription: s, info });
+    }
+  }
+
+  let activeMemberships = 0;
+  let expiredMemberships = 0;
+
+  for (const { info } of memberLatestPayment.values()) {
+    if (info.isActive) {
+      activeMemberships++;
+    } else {
+      expiredMemberships++;
+    }
+  }
 
   res.status(200).json({
     success: true,
@@ -239,9 +377,105 @@ export const getAdminStats = async (req, res) => {
       totalMembers,
       totalTrainers,
       activeMemberships,
+      expiredMemberships,
       totalPayments,
       totalRevenue,
+      pendingPayments,
+      pendingRevenue,
+      todayAttendance,
       recentMembers: recentMembers.map(toPublicUser),
+      recentPayments,
+      recentAttendance,
+    },
+  });
+};
+
+export const getTrainerAssignmentsOverview = async (req, res) => {
+  const [trainers, members, paidPayments] = await Promise.all([
+    User.find({ role: 'trainer' })
+      .select('_id fullName email phone specialization profileImage createdAt')
+      .sort({ fullName: 1 })
+      .lean(),
+    User.find({ role: 'member' })
+      .select('_id fullName email phone gender profileImage assignedTrainer createdAt')
+      .sort({ fullName: 1 })
+      .lean(),
+    Payment.find({ paymentStatus: 'paid' })
+      .populate('membership', 'duration')
+      .sort({ paymentDate: -1 })
+      .lean(),
+  ]);
+
+  const memberLatestPayment = new Map();
+  for (const p of paidPayments) {
+    const mId = p.member?.toString();
+    if (!mId) continue;
+    const info = computeMembershipExpiry(p);
+    if (!info) continue;
+
+    const existing = memberLatestPayment.get(mId);
+    if (!existing || info.paymentDate.getTime() > existing.info.paymentDate.getTime()) {
+      memberLatestPayment.set(mId, { payment: p, info });
+    }
+  }
+
+  const getMemberStatus = (memberId) => {
+    const record = memberLatestPayment.get(memberId.toString());
+    if (!record) return 'none';
+    return record.info.status;
+  };
+
+  const trainerMap = new Map();
+  for (const t of trainers) {
+    trainerMap.set(t._id.toString(), {
+      _id: t._id,
+      fullName: t.fullName,
+      email: t.email,
+      phone: t.phone || '',
+      specialization: t.specialization || '',
+      profileImage: t.profileImage || '',
+      assignedMembersCount: 0,
+      assignedMembers: [],
+    });
+  }
+
+  const unassignedMembers = [];
+  let totalAssignedMembers = 0;
+
+  for (const m of members) {
+    const memberObj = {
+      _id: m._id,
+      fullName: m.fullName,
+      email: m.email,
+      phone: m.phone || '',
+      gender: m.gender || '',
+      profileImage: m.profileImage || '',
+      membershipStatus: getMemberStatus(m._id),
+      createdAt: m.createdAt,
+    };
+
+    const tId = m.assignedTrainer ? m.assignedTrainer.toString() : null;
+    if (tId && trainerMap.has(tId)) {
+      const trainer = trainerMap.get(tId);
+      trainer.assignedMembers.push(memberObj);
+      trainer.assignedMembersCount++;
+      totalAssignedMembers++;
+    } else {
+      unassignedMembers.push(memberObj);
+    }
+  }
+
+  const trainerAssignments = Array.from(trainerMap.values());
+  const totalUnassignedMembers = unassignedMembers.length;
+
+  res.status(200).json({
+    success: true,
+    data: {
+      totalTrainers: trainers.length,
+      totalAssignedMembers,
+      totalUnassignedMembers,
+      trainers: trainerAssignments,
+      unassignedMembers,
     },
   });
 };
@@ -322,11 +556,47 @@ export const getTrainerOverview = async (req, res) => {
   }
 
   // Calculate per-member completion percentage
+  const assignedMemberIds = Array.from(memberMap.keys());
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+
+  const [assignedAttendance, todayAttendanceCount] = await Promise.all([
+    Attendance.find({ member: { $in: assignedMemberIds } })
+      .populate('member', '_id fullName email')
+      .sort({ checkInTime: -1 }),
+    Attendance.countDocuments({
+      member: { $in: assignedMemberIds },
+      checkInTime: { $gte: startOfToday, $lte: endOfToday },
+    }),
+  ]);
+
+  const memberAttendanceMap = new Map();
+  for (const att of assignedAttendance) {
+    const mId = att.member?._id?.toString() || att.member?.toString();
+    if (!memberAttendanceMap.has(mId)) {
+      memberAttendanceMap.set(mId, {
+        total: 0,
+        present: 0,
+        lastCheckIn: att.checkInTime,
+      });
+    }
+    const stat = memberAttendanceMap.get(mId);
+    stat.total++;
+    if (att.status === 'present') stat.present++;
+  }
+
   const assignedMembers = Array.from(memberMap.values()).map((m) => {
     m.completionRate =
       m.assignedWorkoutsCount > 0
         ? Math.round((m.completedWorkoutsCount / m.assignedWorkoutsCount) * 100)
         : 0;
+    const attStat = memberAttendanceMap.get(m._id.toString()) || { total: 0, present: 0, lastCheckIn: null };
+    m.attendanceCount = attStat.total;
+    m.presentCount = attStat.present;
+    m.lastAttendance = attStat.lastCheckIn;
     return m;
   });
 
@@ -380,6 +650,18 @@ export const getTrainerOverview = async (req, res) => {
     });
   }
 
+  // Attendance activities
+  for (const att of assignedAttendance.slice(0, 5)) {
+    activities.push({
+      id: `att_${att._id}`,
+      type: 'member_attendance',
+      title: 'Member Attendance',
+      description: `${att.member?.fullName || 'Member'} attended (${att.status}).`,
+      timestamp: att.checkInTime,
+      metadata: { memberId: att.member?._id, memberName: att.member?.fullName },
+    });
+  }
+
   activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   const recentActivities = activities.slice(0, 10);
 
@@ -391,12 +673,16 @@ export const getTrainerOverview = async (req, res) => {
       activeWorkoutRoutines,
       completedWorkoutSessions,
       overallCompletionRate,
+      todayAttendanceCount,
+      totalAttendanceRecords: assignedAttendance.length,
+      recentAttendance: assignedAttendance.slice(0, 5),
       statistics: {
         totalAssignedMembers: assignedMembers.length,
         activeWorkoutRoutines,
         completedWorkoutSessions,
         overallCompletionRate,
         totalWorkouts,
+        todayAttendanceCount,
       },
       assignedMembers,
       workouts,
@@ -408,17 +694,102 @@ export const getTrainerOverview = async (req, res) => {
 export const getMemberOverview = async (req, res) => {
   const memberId = req.user.id;
 
-  const [workouts, payments] = await Promise.all([
+  const [workouts, payments, attendance, latestSubscription] = await Promise.all([
     Workout.find({ assignedMember: memberId })
       .populate('assignedTrainer', 'fullName email phone profileImage')
       .sort({ createdAt: -1 }),
     Payment.find({ member: memberId })
       .populate('membership')
+      .populate('subscription')
       .sort({ paymentDate: -1 }),
+    Attendance.find({ member: memberId }).sort({ checkInTime: -1 }),
+    Subscription.findOne({ member: memberId })
+      .populate('membershipPlan')
+      .populate('payment')
+      .sort({ endDate: -1 }),
   ]);
 
-  const activePayment = payments.find((p) => p.paymentStatus === 'paid');
-  const activePlan = activePayment?.membership || null;
+  // Identify latest valid paid payment for membership status & expiry
+  const validPaidPayments = payments
+    .filter((p) => p.paymentStatus === 'paid')
+    .sort(
+      (a, b) =>
+        new Date(b.paymentDate || b.createdAt).getTime() -
+        new Date(a.paymentDate || a.createdAt).getTime(),
+    );
+
+  const activePayment = validPaidPayments[0] || null;
+  const activePlan = latestSubscription?.membershipPlan || activePayment?.membership || null;
+
+  // Membership status and expiry
+  let membershipStatus = 'none';
+  let membershipExpiry = null;
+  let daysRemaining = null;
+  let subscriptionStartDate = null;
+  let subscriptionEndDate = null;
+
+  if (latestSubscription) {
+    const info = computeMembershipExpiry(null, latestSubscription);
+    if (info) {
+      membershipExpiry = info.expiryISO;
+      daysRemaining = info.daysRemaining;
+      membershipStatus = info.status;
+      subscriptionStartDate = info.startDate;
+      subscriptionEndDate = info.endDate;
+    }
+  } else if (activePayment && activePlan) {
+    const info = computeMembershipExpiry(activePayment);
+    if (info) {
+      membershipExpiry = info.expiryISO;
+      daysRemaining = info.daysRemaining;
+      membershipStatus = info.status;
+      subscriptionStartDate = info.startDate;
+      subscriptionEndDate = info.endDate;
+    }
+  }
+
+  // Payment summary
+  let totalPaid = 0;
+  let pendingCount = 0;
+  for (const p of payments) {
+    if (p.paymentStatus === 'paid') totalPaid += p.amount;
+    if (p.paymentStatus === 'pending') pendingCount++;
+  }
+  const paymentSummary = {
+    totalPaid,
+    pendingCount,
+    totalCount: payments.length,
+    payments: payments.slice(0, 5),
+  };
+
+  // Attendance summary
+  let presentCount = 0;
+  let lateCount = 0;
+  let absentCount = 0;
+  for (const a of attendance) {
+    if (a.status === 'present') presentCount++;
+    else if (a.status === 'late') lateCount++;
+    else if (a.status === 'absent') absentCount++;
+  }
+  const attendanceRate = attendance.length > 0 ? Math.round(((presentCount + lateCount) / attendance.length) * 100) : 0;
+  const attendanceSummary = {
+    totalAttendance: attendance.length,
+    presentCount,
+    lateCount,
+    absentCount,
+    attendanceRate,
+    lastCheckIn: attendance[0]?.checkInTime || null,
+    recentAttendance: attendance.slice(0, 5),
+  };
+
+  // Workout progress
+  const completedWorkouts = workouts.filter((w) => w.status === 'completed').length;
+  const workoutSummary = {
+    totalWorkouts: workouts.length,
+    completedWorkouts,
+    activeWorkouts: workouts.length - completedWorkouts,
+    completionRate: workouts.length > 0 ? Math.round((completedWorkouts / workouts.length) * 100) : 0,
+  };
 
   res.status(200).json({
     success: true,
@@ -427,6 +798,16 @@ export const getMemberOverview = async (req, res) => {
       activePlan,
       workouts,
       payments,
+      attendance,
+      membershipStatus,
+      membershipExpiry,
+      daysRemaining,
+      subscription: latestSubscription || null,
+      subscriptionStartDate,
+      subscriptionEndDate,
+      paymentSummary,
+      attendanceSummary,
+      workoutSummary,
     },
   });
 };

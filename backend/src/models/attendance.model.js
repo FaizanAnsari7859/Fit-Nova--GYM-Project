@@ -8,7 +8,10 @@ const attendanceSchema = new mongoose.Schema(
       ref: 'User',
       required: [true, 'Member is required.'],
       validate: {
-        validator: async (id) => {
+        validator: async function (id) {
+          if (this && typeof this.isModified === 'function' && !this.isNew && !this.isModified('member')) {
+            return true;
+          }
           const user = await User.findById(id).select('role');
           return user?.role === 'member';
         },
@@ -50,6 +53,15 @@ const attendanceSchema = new mongoose.Schema(
 );
 
 attendanceSchema.index({ member: 1, attendanceDate: 1 });
+attendanceSchema.index({ member: 1, checkInTime: -1 });
+attendanceSchema.index({ checkInTime: -1 });
+attendanceSchema.index(
+  { member: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { checkOutTime: null },
+  },
+);
 
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 

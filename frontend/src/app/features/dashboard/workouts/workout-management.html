@@ -138,11 +138,11 @@
           <div class="workout-people">
             <div class="person-tag">
               <span class="person-label">Member:</span>
-              <span class="person-name">{{ w.assignedMember.fullName }}</span>
+              <span class="person-name">{{ w.assignedMember?.fullName || 'Unassigned' }}</span>
             </div>
             <div class="person-tag">
               <span class="person-label">Trainer:</span>
-              <span class="person-name">{{ w.assignedTrainer.fullName }}</span>
+              <span class="person-name">{{ w.assignedTrainer?.fullName || 'Unassigned' }}</span>
             </div>
           </div>
 
@@ -170,7 +170,7 @@
           <!-- Footer card actions -->
           <div class="workout-card-footer">
             <button type="button" class="btn btn-ghost btn-sm" (click)="openView(w)">Details</button>
-            @if (userRole() === 'admin' || (userRole() === 'trainer' && w.assignedTrainer._id === currentUser()?._id)) {
+            @if (userRole() === 'admin' || (userRole() === 'trainer' && w.assignedTrainer?._id === currentUser()?._id)) {
               <div class="plan-actions-group">
                 <button type="button" class="btn-icon primary" title="Edit" (click)="openEdit(w)">✏️</button>
                 <button type="button" class="btn-icon danger" title="Delete" (click)="openDelete(w)">🗑</button>
@@ -230,12 +230,31 @@
 
           <div class="form-field">
             <label>Assign to Member *</label>
-            <select formControlName="assignedMember" [class.invalid]="isInvalid('assignedMember')">
-              <option value="">Select a member…</option>
-              @for (m of members(); track m._id) {
-                <option [value]="m._id">{{ m.fullName }} ({{ m.email }})</option>
+            @if (usersLoading()) {
+              <select disabled>
+                <option>Loading members…</option>
+              </select>
+            } @else {
+              <select
+                formControlName="assignedMember"
+                (change)="onMemberSelectChange($event)"
+                [class.invalid]="isInvalid('assignedMember')"
+              >
+                <option value="">Select a member…</option>
+                @for (m of members(); track m._id) {
+                  <option [value]="m._id">{{ m.fullName }} ({{ m.email }})</option>
+                }
+              </select>
+              @if (members().length === 0) {
+                <span class="error-text">
+                  @if (userRole() === 'trainer') {
+                    No assigned members found. An administrator must assign members to you first.
+                  } @else {
+                    No members found. Ensure members are registered.
+                  }
+                </span>
               }
-            </select>
+            }
           </div>
 
           <div class="form-field">
@@ -249,6 +268,11 @@
                   <option [value]="t._id">{{ t.fullName }} ({{ t.email }})</option>
                 }
               </select>
+              @if (selectedMemberTrainerName()) {
+                <span class="assigned-trainer-hint" style="font-size: 0.8rem; color: #ff8533; margin-top: 4px; display: block;">
+                  ✓ Linked Trainer: {{ selectedMemberTrainerName() }}
+                </span>
+              }
             }
           </div>
 
@@ -335,11 +359,11 @@
         </div>
         <div class="info-row">
           <div class="info-label">Assigned Member</div>
-          <div class="info-value">{{ selectedWorkout()!.assignedMember.fullName }}</div>
+          <div class="info-value">{{ selectedWorkout()!.assignedMember?.fullName || 'Unassigned' }}</div>
         </div>
         <div class="info-row">
           <div class="info-label">Assigned Trainer</div>
-          <div class="info-value">{{ selectedWorkout()!.assignedTrainer.fullName }}</div>
+          <div class="info-value">{{ selectedWorkout()!.assignedTrainer?.fullName || 'Unassigned' }}</div>
         </div>
         @if (selectedWorkout()!.schedule) {
           <div class="info-row">

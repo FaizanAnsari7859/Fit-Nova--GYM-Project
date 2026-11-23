@@ -1,0 +1,351 @@
+<!-- Page header -->
+<div class="page-header">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Attendance Management</div>
+      <div class="topbar-breadcrumb">FitNova · Dashboard · Attendance</div>
+    </div>
+    @if (canRecord()) {
+      <button type="button" class="btn btn-accent btn-sm" (click)="openCheckInModal()">
+        + Record Check-In
+      </button>
+    }
+  </div>
+</div>
+
+<div class="page-content">
+  <!-- Alerts -->
+  @if (success()) {
+    <div class="alert alert-success">{{ success() }}</div>
+  }
+  @if (error() && !modalMode()) {
+    <div class="alert alert-error">{{ error() }}</div>
+  }
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    @if (userRole() === 'admin' || userRole() === 'trainer') {
+      <select class="filter-select" (change)="onMemberFilterChange($event)">
+        <option value="">{{ userRole() === 'admin' ? 'All Members' : 'All My Members' }}</option>
+        @for (m of membersList(); track m._id) {
+          <option [value]="m._id" [selected]="memberFilter() === m._id">
+            {{ m.fullName }} ({{ m.email }})
+          </option>
+        }
+      </select>
+    }
+
+    <select class="filter-select" (change)="onStatusFilterChange($event)">
+      <option value="">All Statuses</option>
+      <option value="present" [selected]="statusFilter() === 'present'">Present</option>
+      <option value="late" [selected]="statusFilter() === 'late'">Late</option>
+      <option value="absent" [selected]="statusFilter() === 'absent'">Absent</option>
+    </select>
+
+    <div class="date-filter-group">
+      <label class="filter-label" for="dateInput">Date:</label>
+      <input
+        id="dateInput"
+        class="filter-date"
+        type="date"
+        [value]="dateFilter()"
+        (change)="onDateFilterChange($event)"
+      />
+    </div>
+
+    <div class="date-filter-group">
+      <label class="filter-label" for="startInput">From:</label>
+      <input
+        id="startInput"
+        class="filter-date"
+        type="date"
+        [value]="startDateFilter()"
+        (change)="onStartDateChange($event)"
+      />
+    </div>
+
+    <div class="date-filter-group">
+      <label class="filter-label" for="endInput">To:</label>
+      <input
+        id="endInput"
+        class="filter-date"
+        type="date"
+        [value]="endDateFilter()"
+        (change)="onEndDateChange($event)"
+      />
+    </div>
+
+    <button type="button" class="btn btn-outline btn-sm" (click)="resetFilters()">
+      Reset
+    </button>
+  </div>
+
+  <!-- Table Section -->
+  <div class="section-card">
+    @if (loading()) {
+      <div class="spinner-overlay">
+        <div class="spinner-sm"></div>
+        <span>Loading attendance records…</span>
+      </div>
+    } @else if (records().length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon">⏱️</div>
+        <div class="empty-title">No attendance records found</div>
+        <div class="empty-sub">No check-in or attendance entries match the current filter selection.</div>
+      </div>
+    } @else {
+      <div class="data-table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Member</th>
+              <th>Date</th>
+              <th>Check-In</th>
+              <th>Check-Out</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of records(); track r._id) {
+              <tr>
+                <td>
+                  <div class="user-cell">
+                    <div class="user-cell-avatar">⏱️</div>
+                    <div>
+                      <div class="user-cell-name">{{ getMemberName(r.member) }}</div>
+                      <div class="user-cell-email">{{ getMemberEmail(r.member) }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>{{ r.attendanceDate | date:'mediumDate' }}</td>
+                <td>
+                  <span class="time-tag in">
+                    {{ r.checkInTime | date:'shortTime' }}
+                  </span>
+                </td>
+                <td>
+                  @if (r.checkOutTime) {
+                    <span class="time-tag out">
+                      {{ r.checkOutTime | date:'shortTime' }}
+                    </span>
+                  } @else {
+                    <span class="badge badge-active">Active Session</span>
+                  }
+                </td>
+                <td>
+                  <span [class]="getStatusBadgeClass(r.status)">
+                    {{ r.status }}
+                  </span>
+                </td>
+                <td>
+                  <div class="action-btns">
+                    <!-- Check-out button if session is currently active -->
+                    @if (canRecord() && !r.checkOutTime) {
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline check-out-btn"
+                        title="Record Check-Out"
+                        (click)="openCheckOutModal(r)"
+                      >
+                        🚪 Check Out
+                      </button>
+                    }
+
+                    <!-- Delete button for admin -->
+                    @if (canDelete()) {
+                      <button
+                        type="button"
+                        class="btn-icon danger"
+                        title="Delete Record"
+                        (click)="openDeleteModal(r)"
+                      >
+                        🗑
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination Footer -->
+      <div class="pagination-footer">
+        <div class="pagination-info">
+          Page {{ currentPage() }} of {{ totalPages() }} ({{ totalCount() }} total records)
+        </div>
+        <div class="pagination-actions">
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            [disabled]="currentPage() <= 1"
+            (click)="previousPage()"
+          >
+            ← Previous
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            [disabled]="currentPage() >= totalPages()"
+            (click)="nextPage()"
+          >
+            Next →
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- ==================== MODALS ==================== -->
+
+<!-- 1. Check-In Modal (Admin or Trainer) -->
+@if (modalMode() === 'checkin') {
+  <div class="modal-backdrop" (click)="closeModal()">
+    <div class="modal-card modal-sm" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Record Check-In</h3>
+        <button type="button" class="btn-close" (click)="closeModal()">✕</button>
+      </div>
+
+      @if (error()) {
+        <div class="alert alert-error">{{ error() }}</div>
+      }
+
+      <form [formGroup]="checkInForm" (ngSubmit)="submitCheckIn()">
+        <div class="form-group">
+          <label class="form-label" for="memberCheckInSelect">Member *</label>
+          <select id="memberCheckInSelect" class="form-input" formControlName="member">
+            <option value="" disabled>Select member</option>
+            @for (m of membersList(); track m._id) {
+              <option [value]="m._id">{{ m.fullName }} ({{ m.email }})</option>
+            }
+          </select>
+          @if (checkInForm.get('member')?.invalid && checkInForm.get('member')?.touched) {
+            <span class="field-error">Member selection is required.</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="checkInTimeInput">Check-In Date & Time *</label>
+          <input
+            id="checkInTimeInput"
+            type="datetime-local"
+            class="form-input"
+            formControlName="checkInTime"
+          />
+          @if (checkInForm.get('checkInTime')?.invalid && checkInForm.get('checkInTime')?.touched) {
+            <span class="field-error">Check-in time is required.</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="statusFormSelect">Status *</label>
+          <select id="statusFormSelect" class="form-input" formControlName="status">
+            <option value="present">Present</option>
+            <option value="late">Late</option>
+            <option value="absent">Absent</option>
+          </select>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" (click)="closeModal()">
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-accent" [disabled]="submitting()">
+            {{ submitting() ? 'Recording…' : 'Record Check-In' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- 2. Check-Out Modal -->
+@if (modalMode() === 'checkout') {
+  <div class="modal-backdrop" (click)="closeModal()">
+    <div class="modal-card modal-sm" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Record Check-Out</h3>
+        <button type="button" class="btn-close" (click)="closeModal()">✕</button>
+      </div>
+
+      @if (error()) {
+        <div class="alert alert-error">{{ error() }}</div>
+      }
+
+      <div class="modal-body-desc">
+        Record check-out for
+        <strong>{{ getMemberName(selectedRecord()!.member) }}</strong>.
+        <br />
+        <span class="text-muted-desc">
+          Checked in at: {{ selectedRecord()?.checkInTime | date:'shortTime' }} ({{ selectedRecord()?.attendanceDate | date:'mediumDate' }})
+        </span>
+      </div>
+
+      <form [formGroup]="checkOutForm" (ngSubmit)="submitCheckOut()">
+        <div class="form-group">
+          <label class="form-label" for="checkOutTimeInput">Check-Out Date & Time *</label>
+          <input
+            id="checkOutTimeInput"
+            type="datetime-local"
+            class="form-input"
+            formControlName="checkOutTime"
+          />
+          @if (checkOutForm.get('checkOutTime')?.invalid && checkOutForm.get('checkOutTime')?.touched) {
+            <span class="field-error">Check-out time is required.</span>
+          }
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" (click)="closeModal()">
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-accent" [disabled]="submitting()">
+            {{ submitting() ? 'Saving…' : 'Confirm Check-Out' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- 3. Delete Confirmation Modal (Admin only) -->
+@if (modalMode() === 'delete') {
+  <div class="modal-backdrop" (click)="closeModal()">
+    <div class="modal-card modal-sm" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Delete Attendance Record</h3>
+        <button type="button" class="btn-close" (click)="closeModal()">✕</button>
+      </div>
+
+      @if (error()) {
+        <div class="alert alert-error">{{ error() }}</div>
+      }
+
+      <div class="modal-body-desc">
+        Are you sure you want to permanently delete the attendance record for
+        <strong>{{ getMemberName(selectedRecord()!.member) }}</strong>
+        on {{ selectedRecord()?.attendanceDate | date:'mediumDate' }}?
+        <div class="text-danger-warn">This action cannot be undone.</div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" (click)="closeModal()">
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="btn btn-danger"
+          [disabled]="submitting()"
+          (click)="submitDelete()"
+        >
+          {{ submitting() ? 'Deleting…' : 'Delete Record' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+

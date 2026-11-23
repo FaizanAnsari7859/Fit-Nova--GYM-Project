@@ -5,6 +5,8 @@ import {
   deleteMembership,
   getMembershipById,
   getMemberships,
+  getMemberSubscriptions,
+  getSubscriptions,
   updateMembership,
 } from '../controllers/membership.controller.js';
 import { requireAuth, requireRole } from '../middleware/auth.middleware.js';
@@ -14,6 +16,10 @@ const router = Router();
 
 // All membership endpoints require authentication
 router.use(requireAuth);
+
+// Subscriptions tracking (must precede /:id)
+router.get('/subscriptions', requireRole('admin'), asyncHandler(getSubscriptions));
+router.get('/subscriptions/member/:memberId', requireRole('admin', 'trainer'), asyncHandler(getMemberSubscriptions));
 
 // Anyone logged in can view plans
 router.get('/', asyncHandler(getMemberships));

@@ -19,10 +19,6 @@ export const requireAuth = (req, res, next) => {
 };
 
 export const requireRole = (...roles) => (req, res, next) => {
-  if (process.argv[1]?.includes('test-db.js')) {
-    return next();
-  }
-
   if (!req.user || !roles.includes(req.user.role)) {
     return next(new ApiError(403, 'You do not have access to this resource.'));
   }

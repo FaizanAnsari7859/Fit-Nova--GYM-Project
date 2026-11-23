@@ -13,6 +13,12 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const isApiRequest = req.url.startsWith(environment.apiUrl) || req.url.startsWith('/api');
   const isPublicAuth = PUBLIC_AUTH_PATHS.some((path) => req.url.includes(path));
 
+  // S1 JWT localStorage mitigation: if the token is expired, force logout before the request
+  if (token && isApiRequest && !isPublicAuth && authService.isCurrentTokenExpired()) {
+    authService.logout('/login');
+    return throwError(() => new Error('Session expired. Please log in again.'));
+  }
+
   let authReq = req;
   if (token && isApiRequest && !isPublicAuth) {
     authReq = req.clone({

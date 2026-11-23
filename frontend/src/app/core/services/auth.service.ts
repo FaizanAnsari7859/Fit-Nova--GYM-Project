@@ -16,6 +16,27 @@ import {
 const TOKEN_KEY = 'fitnova_token';
 const USER_KEY = 'fitnova_user';
 
+/** Decode a JWT payload without verifying the signature (client-side only). */
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    // Base64url → Base64 → JSON
+    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(payload));
+  } catch {
+    return null;
+  }
+}
+
+/** Returns true if the token has an `exp` claim that is in the past. */
+function isTokenExpired(token: string): boolean {
+  const payload = decodeJwtPayload(token);
+  if (!payload || typeof payload['exp'] !== 'number') return false;
+  // exp is in seconds; Date.now() is in milliseconds
+  return payload['exp'] * 1000 < Date.now();
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -102,6 +123,17 @@ export class AuthService {
     return roleList.includes(current.role);
   }
 
+  /**
+   * Check whether the currently stored token is expired.
+   * Client-side check only (no signature verification).
+   * The backend still verifies the token on every request.
+   * S1 JWT localStorage mitigation: eagerly clear expired sessions.
+   */
+  public isCurrentTokenExpired(): boolean {
+    const token = this.tokenSignal();
+    return token ? isTokenExpired(token) : false;
+  }
+
   private setSession(token: string, user: User): void {
     this.writeStorage(TOKEN_KEY, token);
     this.writeStorage(USER_KEY, JSON.stringify(user));
@@ -125,7 +157,14 @@ export class AuthService {
       return null;
     }
     try {
-      return localStorage.getItem(TOKEN_KEY);
+      const token = localStorage.getItem(TOKEN_KEY);
+      // Clear expired tokens eagerly so guards and interceptors see null immediately
+      if (token && isTokenExpired(token)) {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
+        return null;
+      }
+      return token;
     } catch {
       return null;
     }

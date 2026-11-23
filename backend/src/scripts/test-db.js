@@ -140,6 +140,26 @@ try {
   assert(trainerLogin.status === 200, `Trainer login failed: ${trainerLogin.raw}`);
   const trainerToken = trainerLogin.data.token;
 
+  // Create and log in an Admin user fixture for admin-only operations
+  const adminEmail = `admin.${stamp}@fitnova.test`;
+  const adminPhone = `70000${String(stamp).slice(-5)}`;
+  const adminUser = await User.create({
+    fullName: 'Admin Tester',
+    email: adminEmail,
+    phone: adminPhone,
+    password,
+    gender: 'other',
+    dateOfBirth: new Date('1990-01-01'),
+    role: 'admin',
+  });
+  createdIds.users.push(adminUser._id);
+
+  const adminLogin = await api(baseUrl, 'POST', '/api/auth/login', {
+    body: { email: adminEmail, password },
+  });
+  assert(adminLogin.status === 200, `Admin login failed: ${adminLogin.raw}`);
+  const adminToken = adminLogin.data.token;
+
   const badLogin = await api(baseUrl, 'POST', '/api/auth/login', {
     body: { email: memberEmail, password: 'wrong-password' },
   });
@@ -151,8 +171,21 @@ try {
   });
   assert(updated.status === 200 && updated.data.data.fullName === 'Asha R. Rao', `Profile update failed: ${updated.raw}`);
 
-  const membership = await api(baseUrl, 'POST', '/api/memberships', {
+  // RBAC test: Member cannot create a membership plan
+  const memberPlanAttempt = await api(baseUrl, 'POST', '/api/memberships', {
     token,
+    body: {
+      planName: 'Forbidden Plan',
+      duration: 30,
+      price: 999,
+      status: 'active',
+    },
+  });
+  assert(memberPlanAttempt.status === 403, 'Member was able to create membership plan without admin role.');
+
+  // Admin creates membership plan
+  const membership = await api(baseUrl, 'POST', '/api/memberships', {
+    token: adminToken,
     body: {
       planName: 'Nova Monthly',
       duration: 30,
@@ -164,14 +197,22 @@ try {
   assert(membership.status === 201, `Membership insert failed: ${membership.raw}`);
   createdIds.memberships.push(membership.data.data._id);
 
+  // Admin updates membership plan
   const membershipPrice = await api(baseUrl, 'PATCH', `/api/memberships/${membership.data.data._id}`, {
-    token,
+    token: adminToken,
     body: { price: 1599 },
   });
   assert(membershipPrice.status === 200 && membershipPrice.data.data.price === 1599, `Membership update failed: ${membershipPrice.raw}`);
 
   const memberships = await api(baseUrl, 'GET', '/api/memberships', { token });
   assert(memberships.status === 200 && memberships.data.data.some((item) => item._id === membership.data.data._id), 'Membership retrieval failed.');
+
+  // Admin assigns trainer to member (explicit assignment required per S14)
+  const assignRes = await api(baseUrl, 'PATCH', `/api/users/${registered.data.data._id}`, {
+    token: adminToken,
+    body: { assignedTrainer: trainer.data.data._id },
+  });
+  assert(assignRes.status === 200, `Admin assigning trainer failed: ${assignRes.raw}`);
 
   const workout = await api(baseUrl, 'POST', '/api/workouts', {
     token: trainerToken,
@@ -187,8 +228,23 @@ try {
   assert(workout.status === 201, `Workout insert failed: ${workout.raw}`);
   createdIds.workouts.push(workout.data.data._id);
 
-  const payment = await api(baseUrl, 'POST', '/api/payments', {
+  // RBAC test: Member cannot create manual payment
+  const memberPaymentAttempt = await api(baseUrl, 'POST', '/api/payments', {
     token,
+    body: {
+      member: registered.data.data._id,
+      membership: membership.data.data._id,
+      amount: 1599,
+      paymentStatus: 'paid',
+      transactionReference: `txn-fail-${stamp}`,
+      paymentDate: new Date().toISOString(),
+    },
+  });
+  assert(memberPaymentAttempt.status === 403, 'Member was able to create manual payment without admin role.');
+
+  // Admin creates manual payment
+  const payment = await api(baseUrl, 'POST', '/api/payments', {
+    token: adminToken,
     body: {
       member: registered.data.data._id,
       membership: membership.data.data._id,
@@ -201,9 +257,21 @@ try {
   assert(payment.status === 201, `Payment insert failed: ${payment.raw}`);
   createdIds.payments.push(payment.data.data._id);
 
+  // RBAC test: Member cannot record attendance directly
+  const memberCheckInAttempt = await api(baseUrl, 'POST', '/api/attendance', {
+    token,
+    body: {
+      member: registered.data.data._id,
+      attendanceDate: new Date().toISOString(),
+      status: 'present',
+    },
+  });
+  assert(memberCheckInAttempt.status === 403, 'Member was able to record attendance directly.');
+
+  // Admin records attendance
   const checkIn = new Date();
   const attendance = await api(baseUrl, 'POST', '/api/attendance', {
-    token,
+    token: adminToken,
     body: {
       member: registered.data.data._id,
       checkInTime: checkIn.toISOString(),
@@ -215,7 +283,12 @@ try {
   assert(attendance.status === 201, `Attendance insert failed: ${attendance.raw}`);
   createdIds.attendance.push(attendance.data.data._id);
 
-  const removed = await api(baseUrl, 'DELETE', `/api/attendance/${attendance.data.data._id}`, { token });
+  // RBAC test: Member cannot delete attendance record
+  const memberDeleteAttempt = await api(baseUrl, 'DELETE', `/api/attendance/${attendance.data.data._id}`, { token });
+  assert(memberDeleteAttempt.status === 403, 'Member was able to delete attendance record.');
+
+  // Admin deletes attendance
+  const removed = await api(baseUrl, 'DELETE', `/api/attendance/${attendance.data.data._id}`, { token: adminToken });
   assert(removed.status === 200, `Attendance delete failed: ${removed.raw}`);
 
   const missing = await api(baseUrl, 'GET', `/api/attendance/${attendance.data.data._id}`, { token });

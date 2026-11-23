@@ -9,9 +9,15 @@ export interface AdminStats {
   totalMembers: number;
   totalTrainers: number;
   activeMemberships: number;
+  expiredMemberships?: number;
   totalPayments: number;
   totalRevenue: number;
+  pendingPayments?: number;
+  pendingRevenue?: number;
+  todayAttendance?: number;
   recentMembers: User[];
+  recentPayments?: any[];
+  recentAttendance?: any[];
 }
 
 export interface AssignedMemberSummary {
@@ -26,11 +32,14 @@ export interface AssignedMemberSummary {
   completedWorkoutsCount: number;
   activeWorkoutsCount: number;
   completionRate: number;
+  attendanceCount?: number;
+  presentCount?: number;
+  lastAttendance?: string | null;
 }
 
 export interface TrainerActivityItem {
   id: string;
-  type: 'member_assigned' | 'workout_assigned' | 'workout_completed';
+  type: 'member_assigned' | 'workout_assigned' | 'workout_completed' | 'member_attendance';
   title: string;
   description: string;
   timestamp: string;
@@ -47,6 +56,7 @@ export interface TrainerStatistics {
   completedWorkoutSessions: number;
   overallCompletionRate: number;
   totalWorkouts: number;
+  todayAttendanceCount?: number;
 }
 
 export interface TrainerOverview {
@@ -55,10 +65,37 @@ export interface TrainerOverview {
   activeWorkoutRoutines: number;
   completedWorkoutSessions: number;
   overallCompletionRate: number;
+  todayAttendanceCount?: number;
+  totalAttendanceRecords?: number;
+  recentAttendance?: any[];
   statistics?: TrainerStatistics;
   assignedMembers: AssignedMemberSummary[];
   workouts: WorkoutSummary[];
   recentActivities: TrainerActivityItem[];
+}
+
+export interface MemberPaymentSummary {
+  totalPaid: number;
+  pendingCount: number;
+  totalCount: number;
+  payments: Payment[];
+}
+
+export interface MemberAttendanceSummary {
+  totalAttendance: number;
+  presentCount: number;
+  lateCount: number;
+  absentCount: number;
+  attendanceRate: number;
+  lastCheckIn: string | null;
+  recentAttendance: any[];
+}
+
+export interface MemberWorkoutProgress {
+  totalWorkouts: number;
+  completedWorkouts: number;
+  activeWorkouts: number;
+  completionRate: number;
 }
 
 export interface MemberOverview {
@@ -66,6 +103,13 @@ export interface MemberOverview {
   activePlan: MembershipPlan | null;
   workouts: WorkoutSummary[];
   payments: Payment[];
+  attendance?: any[];
+  membershipStatus?: 'active' | 'expired' | 'none';
+  membershipExpiry?: string | null;
+  daysRemaining?: number | null;
+  paymentSummary?: MemberPaymentSummary;
+  attendanceSummary?: MemberAttendanceSummary;
+  workoutSummary?: MemberWorkoutProgress;
 }
 
 export interface WorkoutSummary {
@@ -101,12 +145,48 @@ export interface UsersListResponse {
   success: boolean;
   count: number;
   data: User[];
+  total?: number;
+  page?: number;
+  totalPages?: number;
+  limit?: number;
+}
+
+export interface AssignedMemberItem {
+  _id: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  gender?: string;
+  profileImage?: string;
+  membershipStatus?: 'active' | 'expired' | 'none';
+  createdAt?: string;
+}
+
+export interface TrainerAssignmentItem {
+  _id: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  specialization?: string;
+  profileImage?: string;
+  assignedMembersCount: number;
+  assignedMembers: AssignedMemberItem[];
+}
+
+export interface TrainerAssignmentsOverview {
+  totalTrainers: number;
+  totalAssignedMembers: number;
+  totalUnassignedMembers: number;
+  trainers: TrainerAssignmentItem[];
+  unassignedMembers: AssignedMemberItem[];
 }
 
 export interface UserFilters {
   role?: string;
   gender?: string;
   search?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface CreateUserPayload {
@@ -128,6 +208,10 @@ export interface UpdateUserPayload {
   dateOfBirth?: string;
   role?: string;
   password?: string;
+  specialization?: string;
+  experienceYears?: number;
+  bio?: string;
+  assignedTrainer?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -138,6 +222,14 @@ export class UserService {
   getAdminStats(): Observable<AdminStats> {
     return this.http
       .get<{ success: boolean; data: AdminStats }>(`${this.apiUrl}/users/admin/stats`)
+      .pipe(map((r) => r.data));
+  }
+
+  getTrainerAssignmentsOverview(): Observable<TrainerAssignmentsOverview> {
+    return this.http
+      .get<{ success: boolean; data: TrainerAssignmentsOverview }>(
+        `${this.apiUrl}/users/admin/trainer-assignments`,
+      )
       .pipe(map((r) => r.data));
   }
 
@@ -158,9 +250,21 @@ export class UserService {
     if (filters.role) params = params.set('role', filters.role);
     if (filters.gender) params = params.set('gender', filters.gender);
     if (filters.search) params = params.set('search', filters.search);
+    if (filters.page) params = params.set('page', filters.page.toString());
+    if (filters.limit) params = params.set('limit', filters.limit.toString());
     return this.http
       .get<UsersListResponse>(`${this.apiUrl}/users`, { params })
       .pipe(map((r) => r.data));
+  }
+
+  getUsersPaged(filters: UserFilters = {}): Observable<UsersListResponse> {
+    let params = new HttpParams();
+    if (filters.role) params = params.set('role', filters.role);
+    if (filters.gender) params = params.set('gender', filters.gender);
+    if (filters.search) params = params.set('search', filters.search);
+    if (filters.page) params = params.set('page', filters.page.toString());
+    if (filters.limit) params = params.set('limit', filters.limit.toString());
+    return this.http.get<UsersListResponse>(`${this.apiUrl}/users`, { params });
   }
 
   getUserById(id: string): Observable<User> {

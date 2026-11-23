@@ -2,7 +2,12 @@
   <div class="topbar">
     <div>
       <div class="topbar-title">Member Dashboard</div>
-      <div class="topbar-breadcrumb">FitNova · Member · Overview</div>
+      <div class="topbar-breadcrumb">FitNova · Member · Fitness Hub</div>
+    </div>
+    <div class="topbar-actions" style="display: flex; gap: 8px;">
+      <a class="btn btn-secondary btn-sm" routerLink="/dashboard/workouts">My Workouts</a>
+      <a class="btn btn-secondary btn-sm" routerLink="/dashboard/attendance">My Attendance</a>
+      <a class="btn btn-secondary btn-sm" routerLink="/dashboard/admin/payments">My Payments</a>
     </div>
   </div>
 </div>
@@ -11,36 +16,67 @@
   @if (loading()) {
     <div class="spinner-overlay">
       <div class="spinner-sm"></div>
-      Loading your dashboard…
+      Loading your fitness summary…
     </div>
   } @else if (error()) {
     <div class="alert alert-error">{{ error() }}</div>
   } @else {
-    <!-- Stat cards -->
-    <div class="stats-grid">
-      <div class="stat-card accent">
-        <div class="stat-icon">🏋️</div>
-        <div class="stat-value">{{ overview()?.totalWorkouts ?? 0 }}</div>
-        <div class="stat-label">Assigned Workouts</div>
-      </div>
-      <div class="stat-card">
+    <!-- Stat cards grid -->
+    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+      <!-- 1. Membership Status Card -->
+      <div class="stat-card" [class.accent]="overview()?.membershipStatus === 'active'">
         <div class="stat-icon">🏷️</div>
-        <div class="stat-value" style="font-size: 1.4rem;">
-          {{ overview()?.activePlan?.planName ?? 'No Active Plan' }}
+        <div class="stat-value" style="font-size: 1.3rem; text-transform: capitalize;">
+          {{ overview()?.membershipStatus ?? 'None' }}
         </div>
-        <div class="stat-label">Membership Plan</div>
+        <div class="stat-label">Membership Status</div>
+        <div style="font-size: 0.78rem; color: var(--color-muted); margin-top: 4px;">
+          @if (overview()?.membershipStatus === 'active') {
+            {{ overview()?.daysRemaining }} days remaining
+          } @else if (overview()?.membershipStatus === 'expired') {
+            Plan expired · Please renew
+          } @else {
+            No active plan subscribed
+          }
+        </div>
       </div>
+
+      <!-- 2. Workout Progress Card -->
+      <div class="stat-card">
+        <div class="stat-icon">🏋️</div>
+        <div class="stat-value">{{ overview()?.workoutSummary?.completionRate ?? 0 }}%</div>
+        <div class="stat-label">Workout Completion</div>
+        <div style="font-size: 0.78rem; color: var(--color-muted); margin-top: 4px;">
+          {{ overview()?.workoutSummary?.completedWorkouts ?? 0 }} of {{ overview()?.workoutSummary?.totalWorkouts ?? 0 }} routines finished
+        </div>
+      </div>
+
+      <!-- 3. Attendance Summary Card -->
+      <div class="stat-card">
+        <div class="stat-icon">⏱️</div>
+        <div class="stat-value">{{ overview()?.attendanceSummary?.totalAttendance ?? 0 }}</div>
+        <div class="stat-label">Total Check-Ins</div>
+        <div style="font-size: 0.78rem; color: var(--color-muted); margin-top: 4px;">
+          {{ overview()?.attendanceSummary?.attendanceRate ?? 0 }}% attendance rate
+        </div>
+      </div>
+
+      <!-- 4. Payment Summary Card -->
       <div class="stat-card">
         <div class="stat-icon">💳</div>
-        <div class="stat-value">{{ overview()?.payments?.length ?? 0 }}</div>
-        <div class="stat-label">Payment Records</div>
+        <div class="stat-value">{{ overview()?.paymentSummary?.totalPaid ?? 0 | currency:'USD':'symbol':'1.0-0' }}</div>
+        <div class="stat-label">Total Paid</div>
+        <div style="font-size: 0.78rem; color: var(--color-muted); margin-top: 4px;">
+          {{ overview()?.paymentSummary?.pendingCount ?? 0 }} pending invoices
+        </div>
       </div>
     </div>
 
-    <!-- Personal profile -->
+    <!-- Personal Profile Card -->
     <div class="section-card">
       <div class="section-card-header">
         <h2 class="section-card-title">Personal Profile</h2>
+        <a class="btn btn-ghost btn-sm" routerLink="/dashboard/profile">Edit Profile →</a>
       </div>
       @if (currentUser()) {
         <div class="info-grid">
@@ -54,7 +90,7 @@
           </div>
           <div class="info-row">
             <div class="info-label">Phone</div>
-            <div class="info-value">{{ currentUser()!.phone }}</div>
+            <div class="info-value">{{ currentUser()!.phone || '—' }}</div>
           </div>
           <div class="info-row">
             <div class="info-label">Gender</div>
@@ -72,23 +108,34 @@
       }
     </div>
 
-    <!-- Active plan -->
+    <!-- Active Membership Plan Details -->
     <div class="section-card">
       <div class="section-card-header">
         <h2 class="section-card-title">Active Membership Plan</h2>
+        <a class="btn btn-ghost btn-sm" routerLink="/dashboard/memberships">Explore Plans →</a>
       </div>
       @if (overview()?.activePlan) {
         <div class="plan-card">
           <div class="plan-header">
             <div>
-              <div class="plan-name">{{ overview()!.activePlan!.planName }}</div>
-              <div class="plan-duration">{{ overview()!.activePlan!.duration }} days access</div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="plan-name">{{ overview()!.activePlan!.planName }}</span>
+                <span [class]="getMembershipBadgeClass(overview()?.membershipStatus)">
+                  {{ overview()?.membershipStatus }}
+                </span>
+              </div>
+              <div class="plan-duration" style="margin-top: 4px;">
+                {{ overview()!.activePlan!.duration }} days access
+                @if (overview()?.membershipExpiry) {
+                  · Expires {{ overview()!.membershipExpiry | date:'mediumDate' }}
+                }
+              </div>
             </div>
             <div class="plan-price">
               {{ overview()!.activePlan!.price | currency:'USD':'symbol':'1.0-0' }}
             </div>
           </div>
-          @if (overview()!.activePlan!.features.length > 0) {
+          @if (overview()!.activePlan!.features && overview()!.activePlan!.features.length > 0) {
             <ul class="plan-features">
               @for (feat of overview()!.activePlan!.features; track feat) {
                 <li>✓ {{ feat }}</li>
@@ -101,26 +148,42 @@
           <div class="empty-icon">🏷️</div>
           <div class="empty-title">No active membership plan</div>
           <p style="color: var(--color-muted); font-size: 0.88rem;">
-            Contact the gym desk to subscribe to a membership plan.
+            Contact the gym front desk or subscribe to a membership plan to enjoy full club amenities.
           </p>
         </div>
       }
     </div>
 
-    <!-- Workouts -->
+    <!-- Workout Progress & Routines -->
     <div class="section-card">
       <div class="section-card-header">
-        <h2 class="section-card-title">My Workouts</h2>
+        <h2 class="section-card-title">My Workout Progress</h2>
+        <a class="btn btn-ghost btn-sm" routerLink="/dashboard/workouts">View Workouts →</a>
       </div>
       @if (!overview()?.workouts || overview()!.workouts.length === 0) {
         <div class="empty-state">
           <div class="empty-icon">📋</div>
           <div class="empty-title">No workouts assigned yet</div>
           <p style="color: var(--color-muted); font-size: 0.88rem;">
-            Your assigned trainer will assign your custom workout plans here.
+            Your assigned personal coach will assign tailored workout routines for you here.
           </p>
         </div>
       } @else {
+        <div style="margin-bottom: 16px; padding: 12px 16px; background: rgba(255,255,255,0.03); border-radius: 8px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.88rem; margin-bottom: 6px;">
+            <span>Overall Completion Progress</span>
+            <span style="font-weight: 700; color: var(--color-orange, #ff6b35);">
+              {{ overview()?.workoutSummary?.completionRate ?? 0 }}%
+            </span>
+          </div>
+          <div style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+            <div
+              style="height: 100%; background: var(--color-orange, #ff6b35); border-radius: 3px;"
+              [style.width.%]="overview()?.workoutSummary?.completionRate ?? 0"
+            ></div>
+          </div>
+        </div>
+
         <div class="data-table-wrapper">
           <table class="data-table">
             <thead>
@@ -148,11 +211,79 @@
       }
     </div>
 
-    <!-- Payments -->
+    <!-- Attendance Summary & Recent Check-Ins -->
+    <div class="section-card">
+      <div class="section-card-header">
+        <h2 class="section-card-title">My Attendance Summary</h2>
+        <a class="btn btn-ghost btn-sm" routerLink="/dashboard/attendance">Full Attendance Log →</a>
+      </div>
+      @if (!overview()?.attendanceSummary || overview()!.attendanceSummary!.totalAttendance === 0) {
+        <div class="empty-state">
+          <div class="empty-icon">⏱️</div>
+          <div class="empty-title">No attendance recorded yet</div>
+          <p style="color: var(--color-muted); font-size: 0.88rem;">
+            Check in at the gym desk during visits to track your attendance history.
+          </p>
+        </div>
+      } @else {
+        <div style="display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;">
+          <div style="padding: 10px 16px; background: rgba(255,255,255,0.03); border-radius: 8px;">
+            <div style="font-size: 0.76rem; color: var(--color-muted);">Total Visits</div>
+            <div style="font-size: 1.2rem; font-weight: 700;">{{ overview()!.attendanceSummary!.totalAttendance }}</div>
+          </div>
+          <div style="padding: 10px 16px; background: rgba(255,255,255,0.03); border-radius: 8px;">
+            <div style="font-size: 0.76rem; color: var(--color-muted);">Present</div>
+            <div style="font-size: 1.2rem; font-weight: 700; color: var(--color-success, #22c55e);">
+              {{ overview()!.attendanceSummary!.presentCount }}
+            </div>
+          </div>
+          <div style="padding: 10px 16px; background: rgba(255,255,255,0.03); border-radius: 8px;">
+            <div style="font-size: 0.76rem; color: var(--color-muted);">Late</div>
+            <div style="font-size: 1.2rem; font-weight: 700; color: var(--color-warning, #f59e0b);">
+              {{ overview()!.attendanceSummary!.lateCount }}
+            </div>
+          </div>
+          <div style="padding: 10px 16px; background: rgba(255,255,255,0.03); border-radius: 8px;">
+            <div style="font-size: 0.76rem; color: var(--color-muted);">Attendance Rate</div>
+            <div style="font-size: 1.2rem; font-weight: 700; color: var(--color-orange, #ff6b35);">
+              {{ overview()!.attendanceSummary!.attendanceRate }}%
+            </div>
+          </div>
+        </div>
+
+        @if (overview()!.attendanceSummary!.recentAttendance && overview()!.attendanceSummary!.recentAttendance.length > 0) {
+          <div class="data-table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Check-In</th>
+                  <th>Check-Out</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (att of overview()!.attendanceSummary!.recentAttendance; track att._id) {
+                  <tr>
+                    <td>{{ (att.attendanceDate || att.checkInTime) | date:'mediumDate' }}</td>
+                    <td>{{ att.checkInTime | date:'shortTime' }}</td>
+                    <td>{{ att.checkOutTime ? (att.checkOutTime | date:'shortTime') : 'Active' }}</td>
+                    <td><span [class]="getStatusBadgeClass(att.status)">{{ att.status }}</span></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+    </div>
+
+    <!-- Payments History -->
     @if (overview()?.payments && overview()!.payments.length > 0) {
       <div class="section-card">
         <div class="section-card-header">
-          <h2 class="section-card-title">Payment History</h2>
+          <h2 class="section-card-title">Recent Invoices & Payments</h2>
+          <a class="btn btn-ghost btn-sm" routerLink="/dashboard/admin/payments">View All Payments →</a>
         </div>
         <div class="data-table-wrapper">
           <table class="data-table">
@@ -180,4 +311,3 @@
     }
   }
 </div>
-

@@ -51,6 +51,8 @@ export class WorkoutManagement implements OnInit {
   protected readonly trainers = signal<User[]>([]);
   protected readonly error = signal<string | null>(null);
   protected readonly success = signal<string | null>(null);
+  protected readonly usersLoading = signal(false);
+  protected readonly selectedMemberTrainerName = signal<string | null>(null);
 
   protected readonly modalMode = signal<ModalMode>(null);
   protected readonly selectedWorkout = signal<Workout | null>(null);
@@ -64,6 +66,10 @@ export class WorkoutManagement implements OnInit {
 
   protected readonly userRole = this.authService.userRole;
   protected readonly currentUser = this.authService.currentUser;
+
+  // Pending action to open assign modal once users have loaded
+  private pendingOpenAddMemberId: string | undefined | null = undefined;
+  private usersLoaded = false;
 
   // Progress metrics computed
   protected readonly totalWorkouts = computed(() => this.workouts().length);
@@ -122,6 +128,11 @@ export class WorkoutManagement implements OnInit {
       this.loadUsers();
     }
 
+    // Subscribe to assignedMember changes so selecting a member updates the assigned trainer
+    this.workoutForm.controls.assignedMember.valueChanges.subscribe((memberId) => {
+      this.onMemberSelected(memberId);
+    });
+
     this.route.queryParamMap.subscribe((params) => {
       const mId = params.get('memberId');
       const mName = params.get('memberName');
@@ -133,9 +144,12 @@ export class WorkoutManagement implements OnInit {
       this.loadWorkouts();
 
       if (action === 'assign') {
-        setTimeout(() => {
+        // If users are already loaded, open immediately; otherwise defer until loaded
+        if (this.usersLoaded) {
           this.openAdd(mId || undefined);
-        }, 150);
+        } else {
+          this.pendingOpenAddMemberId = mId;
+        }
       }
     });
   }
@@ -179,13 +193,64 @@ export class WorkoutManagement implements OnInit {
   }
 
   protected loadUsers(): void {
-    this.userService.getUsers().subscribe({
-      next: (users) => {
-        this.members.set(users.filter((u) => u.role === 'member'));
-        this.trainers.set(users.filter((u) => u.role === 'trainer'));
-      },
-      error: () => { },
-    });
+    this.usersLoading.set(true);
+
+    if (this.userRole() === 'trainer') {
+      // Trainers can only assign workouts to their assigned members (per S14 security rules)
+      // and cannot query the admin-only GET /api/users endpoint.
+      this.userService.getTrainerOverview().subscribe({
+        next: (overview) => {
+          const assigned = (overview.assignedMembers || []).map(
+            (m) =>
+              ({
+                _id: m._id,
+                fullName: m.fullName,
+                email: m.email,
+                phone: m.phone || '',
+                gender: (m.gender as any) || 'other',
+                role: 'member',
+                assignedTrainer: this.currentUser() || this.currentUser()?._id || null,
+              }) as User,
+          );
+          this.members.set(assigned);
+          if (this.currentUser()) {
+            this.trainers.set([this.currentUser()!]);
+          }
+          this.usersLoading.set(false);
+          this.usersLoaded = true;
+          // Open add modal now if one was deferred
+          if (this.pendingOpenAddMemberId !== undefined) {
+            this.openAdd(this.pendingOpenAddMemberId || undefined);
+            this.pendingOpenAddMemberId = undefined;
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.usersLoading.set(false);
+          this.usersLoaded = true;
+          this.error.set(err?.error?.message ?? 'Failed to load assigned members.');
+        },
+      });
+    } else {
+      // Admin: can fetch all users and trainers
+      this.userService.getUsers().subscribe({
+        next: (users) => {
+          this.members.set(users.filter((u) => u.role === 'member'));
+          this.trainers.set(users.filter((u) => u.role === 'trainer'));
+          this.usersLoading.set(false);
+          this.usersLoaded = true;
+          // Open add modal now if one was deferred
+          if (this.pendingOpenAddMemberId !== undefined) {
+            this.openAdd(this.pendingOpenAddMemberId || undefined);
+            this.pendingOpenAddMemberId = undefined;
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.usersLoading.set(false);
+          this.usersLoaded = true;
+          this.error.set(err?.error?.message ?? 'Failed to load members.');
+        },
+      });
+    }
   }
 
   protected onSearchChange(event: Event): void {
@@ -201,6 +266,64 @@ export class WorkoutManagement implements OnInit {
   protected onCategoryChange(event: Event): void {
     this.categoryFilter.set((event.target as HTMLSelectElement).value);
     this.loadWorkouts();
+  }
+
+  /**
+   * Called when the assigned member dropdown changes via user interaction.
+   */
+  protected onMemberSelectChange(event: Event): void {
+    const memberId = (event.target as HTMLSelectElement).value;
+    this.onMemberSelected(memberId);
+  }
+
+  /**
+   * Internal handler when a member is selected.
+   * Auto-selects and displays the corresponding assigned trainer.
+   */
+  protected onMemberSelected(memberId: string): void {
+    if (!memberId) {
+      this.selectedMemberTrainerName.set(null);
+      if (this.userRole() !== 'trainer') {
+        this.workoutForm.controls.assignedTrainer.setValue('');
+      }
+      return;
+    }
+
+    const member = this.members().find((m) => m._id === memberId);
+    if (!member) {
+      this.selectedMemberTrainerName.set(null);
+      return;
+    }
+
+    if (this.userRole() === 'trainer') {
+      // Trainer assigns to their own member
+      this.selectedMemberTrainerName.set(this.currentUser()?.fullName ?? 'You');
+      this.workoutForm.controls.assignedTrainer.setValue(this.currentUser()?._id ?? '');
+      return;
+    }
+
+    // Admin role: check if member has an assigned trainer
+    if (member.assignedTrainer) {
+      const trainerId =
+        typeof member.assignedTrainer === 'object' && member.assignedTrainer !== null
+          ? (member.assignedTrainer as any)._id
+          : String(member.assignedTrainer);
+
+      const trainerObj =
+        typeof member.assignedTrainer === 'object' && member.assignedTrainer !== null
+          ? (member.assignedTrainer as any)
+          : this.trainers().find((t) => t._id === trainerId);
+
+      const trainerName = trainerObj?.fullName || 'Assigned Trainer';
+
+      if (trainerId) {
+        this.workoutForm.controls.assignedTrainer.setValue(trainerId);
+        this.selectedMemberTrainerName.set(trainerName);
+      }
+    } else {
+      // Member has no assigned trainer yet
+      this.selectedMemberTrainerName.set(null);
+    }
   }
 
   // Dynamic Exercises
@@ -224,20 +347,29 @@ export class WorkoutManagement implements OnInit {
 
   // Modals
   protected openAdd(preselectedMemberId?: string): void {
+    const memberId = preselectedMemberId || this.filteredMemberId() || '';
+    const trainerId = this.userRole() === 'trainer' ? (this.currentUser()?._id ?? '') : '';
+
     this.workoutForm.reset({
       workoutName: '',
       description: '',
       category: 'Strength',
       duration: 45,
       schedule: 'Mon, Wed, Fri - 8:00 AM',
-      assignedMember: preselectedMemberId || this.filteredMemberId() || '',
-      assignedTrainer: this.userRole() === 'trainer' ? (this.currentUser()?._id ?? '') : '',
+      assignedMember: memberId,
+      assignedTrainer: trainerId,
       status: 'assigned',
     });
     this.exerciseFormArray.clear();
     this.addExercise('Barbell Squat', 3, 10, '60 kg');
     this.addExercise('Bench Press', 3, 10, '50 kg');
     this.addExercise('Deadlift', 3, 8, '80 kg');
+
+    if (memberId) {
+      this.onMemberSelected(memberId);
+    } else {
+      this.selectedMemberTrainerName.set(null);
+    }
 
     this.error.set(null);
     this.success.set(null);
@@ -255,10 +387,12 @@ export class WorkoutManagement implements OnInit {
       category: workout.category,
       duration: workout.duration,
       schedule: workout.schedule || '',
-      assignedMember: workout.assignedMember._id,
-      assignedTrainer: workout.assignedTrainer._id,
+      assignedMember: workout.assignedMember?._id || '',
+      assignedTrainer: workout.assignedTrainer?._id || '',
       status: workout.status,
     });
+
+    this.selectedMemberTrainerName.set(workout.assignedTrainer?.fullName || null);
 
     this.exerciseFormArray.clear();
     if (workout.exercises && workout.exercises.length > 0) {
@@ -284,6 +418,7 @@ export class WorkoutManagement implements OnInit {
   protected closeModal(): void {
     this.modalMode.set(null);
     this.selectedWorkout.set(null);
+    this.selectedMemberTrainerName.set(null);
   }
 
   // Actions
@@ -417,4 +552,3 @@ export class WorkoutManagement implements OnInit {
     return !!(c && c.invalid && (c.touched || c.dirty));
   }
 }
-

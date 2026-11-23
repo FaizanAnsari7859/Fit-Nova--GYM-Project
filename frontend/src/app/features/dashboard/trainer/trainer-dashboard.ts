@@ -33,7 +33,8 @@ type ActivityFilter =
   | 'all'
   | 'workout_assigned'
   | 'workout_completed'
-  | 'member_assigned';
+  | 'member_assigned'
+  | 'member_attendance';
 
 @Component({
   selector: 'app-trainer-dashboard',
@@ -51,23 +52,23 @@ export class TrainerDashboard implements OnInit {
   protected readonly currentUser = this.authService.currentUser;
 
   // State signals
-  protected readonly loading = signal(true);
-  protected readonly overview = signal<TrainerOverview | null>(null);
-  protected readonly error = signal<string | null>(null);
-  protected readonly success = signal<string | null>(null);
+  public readonly loading = signal(true);
+  public readonly overview = signal<TrainerOverview | null>(null);
+  public readonly error = signal<string | null>(null);
+  public readonly success = signal<string | null>(null);
 
   // Filters
-  protected readonly memberSearch = signal('');
-  protected readonly memberFilter = signal<MemberFilter>('all');
-  protected readonly activityFilter = signal<ActivityFilter>('all');
+  public readonly memberSearch = signal('');
+  public readonly memberFilter = signal<MemberFilter>('all');
+  public readonly activityFilter = signal<ActivityFilter>('all');
 
   // Quick Assign Modal state
-  protected readonly showAssignModal = signal(false);
-  protected readonly submittingWorkout = signal(false);
-  protected readonly modalError = signal<string | null>(null);
+  public readonly showAssignModal = signal(false);
+  public readonly submittingWorkout = signal(false);
+  public readonly modalError = signal<string | null>(null);
 
   // Quick Assign Form
-  protected readonly assignForm = new FormGroup({
+  public readonly assignForm = new FormGroup({
     assignedMember: new FormControl('', {
       nonNullable: true,
       validators: [Validators.required],
@@ -144,7 +145,7 @@ export class TrainerDashboard implements OnInit {
     this.loadOverview();
   }
 
-  protected loadOverview(): void {
+  public loadOverview(): void {
     this.loading.set(true);
     this.error.set(null);
 
@@ -191,7 +192,7 @@ export class TrainerDashboard implements OnInit {
     return this.assignForm.controls.exercises;
   }
 
-  protected addExercise(
+  public addExercise(
     name = '',
     sets = 3,
     reps = 10,
@@ -215,11 +216,11 @@ export class TrainerDashboard implements OnInit {
     this.exerciseFormArray.push(group);
   }
 
-  protected removeExercise(index: number): void {
+  public removeExercise(index: number): void {
     this.exerciseFormArray.removeAt(index);
   }
 
-  protected openQuickAssign(preselectedMemberId?: string): void {
+  public openQuickAssign(preselectedMemberId?: string): void {
     const defaultMember =
       preselectedMemberId ||
       (this.overview()?.assignedMembers?.[0]?._id ?? '');
@@ -242,12 +243,12 @@ export class TrainerDashboard implements OnInit {
     this.showAssignModal.set(true);
   }
 
-  protected closeQuickAssign(): void {
+  public closeQuickAssign(): void {
     this.showAssignModal.set(false);
     this.modalError.set(null);
   }
 
-  protected submitQuickAssign(): void {
+  public submitQuickAssign(): void {
     this.modalError.set(null);
     this.success.set(null);
 
@@ -301,7 +302,7 @@ export class TrainerDashboard implements OnInit {
     });
   }
 
-  protected isFieldInvalid(fieldName: string): boolean {
+  public isFieldInvalid(fieldName: string): boolean {
     const c = this.assignForm.get(fieldName);
     return !!(c && c.invalid && (c.touched || c.dirty));
   }

@@ -2,25 +2,27 @@
   <div class="topbar">
     <div>
       <div class="topbar-title">Admin Dashboard</div>
-      <div class="topbar-breadcrumb">FitNova · Overview</div>
+      <div class="topbar-breadcrumb">FitNova · Management Overview</div>
+    </div>
+    <div class="topbar-actions">
+      <a class="btn btn-secondary btn-sm" routerLink="/dashboard/admin/reports">
+        <span>📈 Reports & Analytics</span>
+      </a>
     </div>
   </div>
 </div>
-
-<!-- router outlet for child routes -->
-<router-outlet></router-outlet>
 
 <div class="page-content">
   @if (loading()) {
   <div class="spinner-overlay">
     <div class="spinner-sm"></div>
-    Loading dashboard data…
+    Loading dashboard overview…
   </div>
   } @else if (error()) {
   <div class="alert alert-error">{{ error() }}</div>
   } @else if (stats()) {
   <!-- Stat cards -->
-  <div class="stats-grid">
+  <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
     <div class="stat-card">
       <div class="stat-icon">👥</div>
       <div class="stat-value">{{ stats()!.totalMembers }}</div>
@@ -33,63 +35,417 @@
     </div>
     <div class="stat-card">
       <div class="stat-icon">✅</div>
-      <div class="stat-value">{{ stats()!.activeMemberships }}</div>
+      <div class="stat-value" style="color: var(--color-success, #22c55e);">{{ stats()!.activeMemberships }}</div>
       <div class="stat-label">Active Memberships</div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">💳</div>
-      <div class="stat-value">{{ stats()!.totalPayments }}</div>
-      <div class="stat-label">Total Payments</div>
+      <div class="stat-icon">⏳</div>
+      <div class="stat-value" style="color: var(--color-warning, #f59e0b);">{{ stats()!.expiredMemberships ?? 0 }}</div>
+      <div class="stat-label">Expired Memberships</div>
     </div>
     <div class="stat-card accent">
       <div class="stat-icon">💰</div>
       <div class="stat-value">{{ stats()!.totalRevenue | currency:'USD':'symbol':'1.0-0' }}</div>
-      <div class="stat-label">Total Revenue</div>
+      <div class="stat-label">Payments Collected</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">💳</div>
+      <div class="stat-value">{{ stats()!.pendingPayments ?? 0 }}</div>
+      <div class="stat-label">Pending Payments</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">⏱️</div>
+      <div class="stat-value">{{ stats()!.todayAttendance ?? 0 }}</div>
+      <div class="stat-label">Today's Attendance</div>
     </div>
   </div>
 
-  <!-- Recent members -->
-  <div class="section-card">
-    <div class="section-card-header">
-      <h2 class="section-card-title">Recent Registrations</h2>
-      <a class="btn btn-ghost btn-sm" routerLink="/dashboard/members">View All</a>
-    </div>
-    @if (stats()!.recentMembers.length === 0) {
-      <div class="empty-state">
-        <div class="empty-icon">👤</div>
-        <div class="empty-title">No members yet</div>
+  <!-- Quick navigation strip -->
+  <div style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;">
+    <a class="btn btn-secondary btn-sm" routerLink="/dashboard/members">👥 Manage Members</a>
+    <a class="btn btn-secondary btn-sm" routerLink="/dashboard/admin/trainers">👨‍🏫 Manage Trainers</a>
+    <a class="btn btn-secondary btn-sm" routerLink="/dashboard/admin/payments">💳 Payment Records</a>
+    <a class="btn btn-secondary btn-sm" routerLink="/dashboard/attendance">⏱️ Attendance Records</a>
+    <a class="btn btn-secondary btn-sm" routerLink="/dashboard/admin/reports">📈 Generate Reports</a>
+  </div>
+
+  <!-- Trainer-wise Member Assignments Section -->
+  <div class="section-card" style="margin-bottom: 24px;">
+    <div class="section-card-header"
+      style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <h2 class="section-card-title" style="margin: 0;">Trainer-wise Member Assignments</h2>
+        <div style="font-size: 0.8rem; color: var(--color-muted); margin-top: 2px;">
+          Coaching roster and athlete distribution overview
+        </div>
       </div>
+      <div style="display: flex; gap: 8px;">
+        <button type="button" class="btn btn-secondary btn-xs" (click)="loadAssignments()"
+          [disabled]="loadingAssignments()">
+          🔄 Refresh
+        </button>
+        <a class="btn btn-ghost btn-xs" routerLink="/dashboard/admin/trainers">Manage Trainers →</a>
+      </div>
+    </div>
+
+    @if (loadingAssignments()) {
+    <div class="spinner-overlay" style="padding: 24px;">
+      <div class="spinner-sm"></div>
+      Loading trainer assignments…
+    </div>
+    } @else if (assignmentsError()) {
+    <div class="alert alert-error" style="margin: 16px;">
+      <span>{{ assignmentsError() }}</span>
+      <button type="button" class="btn btn-secondary btn-xs" style="margin-left: 10px;"
+        (click)="loadAssignments()">Retry</button>
+    </div>
+    } @else if (assignments()) {
+    <!-- Summary Cards -->
+    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 20px;">
+      <div class="stat-card">
+        <div class="stat-icon">👨‍🏫</div>
+        <div class="stat-value">{{ assignments()!.totalTrainers }}</div>
+        <div class="stat-label">Total Trainers</div>
+      </div>
+      <div class="stat-card accent">
+        <div class="stat-icon">🏋️</div>
+        <div class="stat-value">{{ assignments()!.totalAssignedMembers }}</div>
+        <div class="stat-label">Assigned Members</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⚠️</div>
+        <div class="stat-value"
+          [style.color]="assignments()!.totalUnassignedMembers > 0 ? 'var(--color-warning, #f59e0b)' : 'inherit'">
+          {{ assignments()!.totalUnassignedMembers }}
+        </div>
+        <div class="stat-label">Unassigned Members</div>
+      </div>
+    </div>
+
+    <!-- Trainers Table -->
+    @if (assignments()!.trainers.length === 0) {
+    <div class="empty-state">
+      <div class="empty-icon">👨‍🏫</div>
+      <div class="empty-title">No trainers found</div>
+      <p style="color: var(--color-muted); font-size: 0.88rem;">Create trainer accounts to begin assigning members.</p>
+    </div>
     } @else {
-      <div class="data-table-wrapper">
-        <table class="data-table">
+    <div class="data-table-wrapper" style="margin-bottom: 24px;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Trainer Name</th>
+            <th>Trainer Email</th>
+            <th>Assigned Members Count</th>
+            <th>Assigned Member Names</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (trainer of assignments()!.trainers; track trainer._id) {
+          <tr [style.background]="isTrainerExpanded(trainer._id) ? 'rgba(255,107,53,0.05)' : 'transparent'">
+            <td>
+              <div class="user-cell">
+                <div class="user-cell-avatar">{{ getInitials(trainer.fullName) }}</div>
+                <div>
+                  <div class="user-cell-name">{{ trainer.fullName }}</div>
+                  @if (trainer.specialization) {
+                  <div style="font-size: 0.76rem; color: var(--color-muted);">{{ trainer.specialization }}</div>
+                  }
+                </div>
+              </div>
+            </td>
+            <td>{{ trainer.email }}</td>
+            <td>
+              <span class="badge" [class.badge-paid]="trainer.assignedMembersCount > 0"
+                [class.badge-pending]="trainer.assignedMembersCount === 0">
+                {{ trainer.assignedMembersCount }} members
+              </span>
+            </td>
+            <td style="font-size: 0.85rem; color: var(--color-muted); max-width: 250px;">
+              {{ getAssignedMemberNames(trainer) }}
+            </td>
+            <td style="text-align: right;">
+              <button type="button" class="btn btn-secondary btn-xs" (click)="toggleTrainer(trainer._id)">
+                {{ isTrainerExpanded(trainer._id) ? '▲ Hide Members' : '▼ View Members (' + trainer.assignedMembersCount
+                + ')' }}
+              </button>
+            </td>
+          </tr>
+
+          <!-- Expanded Member List Row -->
+          @if (isTrainerExpanded(trainer._id)) {
+          <tr>
+            <td colspan="5" style="padding: 0; background: rgba(0,0,0,0.25);">
+              <div style="padding: 16px 20px; border-left: 3px solid var(--color-orange, #ff6b35);">
+                <div
+                  style="font-size: 0.82rem; font-weight: 600; margin-bottom: 10px; color: var(--color-orange, #ff6b35);">
+                  Members assigned to {{ trainer.fullName }}:
+                </div>
+                @if (trainer.assignedMembers.length === 0) {
+                <div style="font-size: 0.84rem; color: var(--color-muted); padding: 8px 0;">
+                  ℹ️ No members are currently assigned to this trainer.
+                </div>
+                } @else {
+                <div class="data-table-wrapper" style="border: 1px solid var(--color-line); border-radius: 6px;">
+                  <table class="data-table" style="font-size: 0.82rem;">
+                    <thead>
+                      <tr style="background: rgba(255,255,255,0.02);">
+                        <th>Member Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Membership Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (member of trainer.assignedMembers; track member._id) {
+                      <tr>
+                        <td style="font-weight: 600;">{{ member.fullName }}</td>
+                        <td>{{ member.email }}</td>
+                        <td>{{ member.phone || '—' }}</td>
+                        <td>
+                          <span [class]="getMembershipBadgeClass(member.membershipStatus)">
+                            {{ member.membershipStatus || 'none' }}
+                          </span>
+                        </td>
+                      </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                }
+              </div>
+            </td>
+          </tr>
+          }
+          }
+        </tbody>
+      </table>
+    </div>
+    }
+
+    <!-- Unassigned Members Section -->
+    <div style="border-top: 1px solid var(--color-line); padding-top: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h3 style="font-size: 1rem; font-weight: 600; margin: 0;">Unassigned Members</h3>
+          <span class="badge" [class.badge-pending]="assignments()!.totalUnassignedMembers > 0"
+            [class.badge-paid]="assignments()!.totalUnassignedMembers === 0">
+            {{ assignments()!.totalUnassignedMembers }}
+          </span>
+        </div>
+        <button type="button" class="btn btn-ghost btn-xs" (click)="toggleUnassigned()">
+          {{ unassignedExpanded() ? '▲ Collapse' : '▼ Expand (' + assignments()!.totalUnassignedMembers + ')' }}
+        </button>
+      </div>
+
+      @if (unassignedExpanded()) {
+      @if (assignments()!.unassignedMembers.length === 0) {
+      <div
+        style="padding: 12px; background: rgba(34, 197, 94, 0.08); border-radius: 6px; color: var(--color-success, #22c55e); font-size: 0.84rem;">
+        ✓ All registered members are currently assigned to a coach.
+      </div>
+      } @else {
+      <div class="data-table-wrapper" style="border: 1px solid var(--color-line); border-radius: 6px;">
+        <table class="data-table" style="font-size: 0.82rem;">
           <thead>
-            <tr>
-              <th>Member</th>
-              <th>Role</th>
+            <tr style="background: rgba(255,255,255,0.02);">
+              <th>Full Name</th>
+              <th>Email</th>
               <th>Phone</th>
-              <th>Joined</th>
+              <th>Membership Status</th>
+              <th style="text-align: right;">Action</th>
             </tr>
           </thead>
           <tbody>
-            @for (member of stats()!.recentMembers; track member._id) {
+            @for (member of assignments()!.unassignedMembers; track member._id) {
             <tr>
+              <td style="font-weight: 600;">{{ member.fullName }}</td>
+              <td>{{ member.email }}</td>
+              <td>{{ member.phone || '—' }}</td>
               <td>
-                <div class="user-cell">
-                  <div class="user-cell-avatar">{{ getInitials(member.fullName) }}</div>
-                  <div>
-                    <div class="user-cell-name">{{ member.fullName }}</div>
-                    <div class="user-cell-email">{{ member.email }}</div>
-                  </div>
-                </div>
+                <span [class]="getMembershipBadgeClass(member.membershipStatus)">
+                  {{ member.membershipStatus || 'none' }}
+                </span>
               </td>
-              <td><span [class]="getRoleBadgeClass(member.role)">{{ member.role }}</span></td>
-              <td>{{ member.phone }}</td>
-              <td>{{ member.createdAt | date:'mediumDate' }}</td>
+              <td style="text-align: right;">
+                <a class="btn btn-outline-accent btn-xs" routerLink="/dashboard/members">
+                  Assign Trainer →
+                </a>
+              </td>
             </tr>
             }
           </tbody>
         </table>
       </div>
+      }
+      }
+    </div>
+    }
+  </div>
+
+  <!-- Recent Activity Section with Tabs -->
+  <div class="section-card">
+    <div class="section-card-header"
+      style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <h2 class="section-card-title" style="margin: 0;">Recent Activity</h2>
+        <div style="display: flex; gap: 6px; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 8px;">
+          <button type="button" class="btn btn-sm"
+            [style.background]="activeTab() === 'registrations' ? 'var(--color-orange, #ff6b35)' : 'transparent'"
+            [style.color]="activeTab() === 'registrations' ? '#fff' : 'var(--color-muted)'"
+            (click)="setActiveTab('registrations')">
+            Registrations ({{ stats()!.recentMembers.length }})
+          </button>
+          <button type="button" class="btn btn-sm"
+            [style.background]="activeTab() === 'payments' ? 'var(--color-orange, #ff6b35)' : 'transparent'"
+            [style.color]="activeTab() === 'payments' ? '#fff' : 'var(--color-muted)'"
+            (click)="setActiveTab('payments')">
+            Payments ({{ stats()!.recentPayments?.length ?? 0 }})
+          </button>
+          <button type="button" class="btn btn-sm"
+            [style.background]="activeTab() === 'attendance' ? 'var(--color-orange, #ff6b35)' : 'transparent'"
+            [style.color]="activeTab() === 'attendance' ? '#fff' : 'var(--color-muted)'"
+            (click)="setActiveTab('attendance')">
+            Attendance ({{ stats()!.recentAttendance?.length ?? 0 }})
+          </button>
+        </div>
+      </div>
+
+      <div>
+        @if (activeTab() === 'registrations') {
+        <a class="btn btn-ghost btn-sm" routerLink="/dashboard/members">View All Members →</a>
+        } @else if (activeTab() === 'payments') {
+        <a class="btn btn-ghost btn-sm" routerLink="/dashboard/admin/payments">View All Payments →</a>
+        } @else {
+        <a class="btn btn-ghost btn-sm" routerLink="/dashboard/attendance">View All Attendance →</a>
+        }
+      </div>
+    </div>
+
+    <!-- Tab 1: Recent Registrations -->
+    @if (activeTab() === 'registrations') {
+    @if (stats()!.recentMembers.length === 0) {
+    <div class="empty-state">
+      <div class="empty-icon">👤</div>
+      <div class="empty-title">No recent registrations</div>
+    </div>
+    } @else {
+    <div class="data-table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Role</th>
+            <th>Phone</th>
+            <th>Joined</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (member of stats()!.recentMembers; track member._id) {
+          <tr>
+            <td>
+              <div class="user-cell">
+                <div class="user-cell-avatar">{{ getInitials(member.fullName) }}</div>
+                <div>
+                  <div class="user-cell-name">{{ member.fullName }}</div>
+                  <div class="user-cell-email">{{ member.email }}</div>
+                </div>
+              </div>
+            </td>
+            <td><span [class]="getRoleBadgeClass(member.role)">{{ member.role }}</span></td>
+            <td>{{ member.phone || '—' }}</td>
+            <td>{{ member.createdAt | date:'mediumDate' }}</td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    }
+    }
+
+    <!-- Tab 2: Recent Payment Activity -->
+    @if (activeTab() === 'payments') {
+    @if (!stats()!.recentPayments || stats()!.recentPayments!.length === 0) {
+    <div class="empty-state">
+      <div class="empty-icon">💳</div>
+      <div class="empty-title">No recent payment activity</div>
+    </div>
+    } @else {
+    <div class="data-table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Reference</th>
+            <th>Member</th>
+            <th>Plan</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (payment of stats()!.recentPayments; track payment._id) {
+          <tr>
+            <td style="font-family: monospace; font-size: 0.82rem;">{{ payment.transactionReference }}</td>
+            <td>{{ payment.member?.fullName ?? 'Unknown Member' }}</td>
+            <td>{{ payment.membership?.planName ?? 'Standard' }}</td>
+            <td style="font-weight: 700;">{{ payment.amount | currency:'USD':'symbol':'1.0-0' }}</td>
+            <td><span [class]="getPaymentBadgeClass(payment.paymentStatus)">{{ payment.paymentStatus }}</span></td>
+            <td>{{ (payment.paymentDate || payment.createdAt) | date:'mediumDate' }}</td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    }
+    }
+
+    <!-- Tab 3: Recent Attendance Activity -->
+    @if (activeTab() === 'attendance') {
+    @if (!stats()!.recentAttendance || stats()!.recentAttendance!.length === 0) {
+    <div class="empty-state">
+      <div class="empty-icon">⏱️</div>
+      <div class="empty-title">No recent attendance records</div>
+    </div>
+    } @else {
+    <div class="data-table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Check-In</th>
+            <th>Check-Out</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (att of stats()!.recentAttendance; track att._id) {
+          <tr>
+            <td>
+              <div class="user-cell">
+                <div class="user-cell-avatar">{{ getInitials(att.member?.fullName || 'M') }}</div>
+                <div>
+                  <div class="user-cell-name">{{ att.member?.fullName ?? 'Unknown Member' }}</div>
+                  <div class="user-cell-email">{{ att.member?.email ?? '' }}</div>
+                </div>
+              </div>
+            </td>
+            <td>{{ att.checkInTime | date:'short' }}</td>
+            <td>
+              @if (att.checkOutTime) {
+              {{ att.checkOutTime | date:'shortTime' }}
+              } @else {
+              <span style="color: var(--color-warning, #f59e0b); font-size: 0.82rem;">Active (In Gym)</span>
+              }
+            </td>
+            <td><span [class]="getAttendanceBadgeClass(att.status)">{{ att.status }}</span></td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    }
     }
   </div>
   }

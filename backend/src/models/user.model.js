@@ -93,6 +93,10 @@ const userSchema = new mongoose.Schema(
   },
 );
 
+// Indexes for role-filtered lists, pagination and trainer-assigned member queries
+userSchema.index({ assignedTrainer: 1, role: 1 });
+userSchema.index({ role: 1, createdAt: -1 });
+
 userSchema.pre('save', async function () {
   if (!this.isModified('password')) {
     return;

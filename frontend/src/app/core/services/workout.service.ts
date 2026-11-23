@@ -24,8 +24,8 @@ export interface Workout {
   exercises?: Exercise[];
   status: WorkoutStatus;
   completedAt?: string | null;
-  assignedMember: User;
-  assignedTrainer: User;
+  assignedMember?: User | null;
+  assignedTrainer?: User | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -102,6 +102,15 @@ export class WorkoutService {
   updateWorkoutStatus(id: string, status: WorkoutStatus): Observable<Workout> {
     return this.http
       .patch<{ success: boolean; data: Workout }>(`${this.apiUrl}/workouts/${id}/status`, { status })
+      .pipe(map((r) => r.data));
+  }
+
+  updateExerciseProgress(workoutId: string, exerciseIdx: number, completed: boolean): Observable<Workout> {
+    return this.http
+      .patch<{ success: boolean; data: Workout }>(
+        `${this.apiUrl}/workouts/${workoutId}/exercises/${exerciseIdx}`,
+        { completed },
+      )
       .pipe(map((r) => r.data));
   }
 

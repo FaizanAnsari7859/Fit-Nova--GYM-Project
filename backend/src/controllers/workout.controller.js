@@ -110,6 +110,19 @@ export const createWorkout = async (req, res) => {
     throw new ApiError(400, 'assignedTrainer must be an existing trainer');
   }
 
+  // Trainer authorization: member must be explicitly assigned to this trainer via admin
+  if (req.user.role === 'trainer') {
+    if (!member.assignedTrainer) {
+      throw new ApiError(
+        403,
+        'This member does not have an assigned trainer. An administrator must assign this member to you first.',
+      );
+    }
+    if (member.assignedTrainer.toString() !== req.user.id) {
+      throw new ApiError(403, 'Trainers can only assign workouts to members assigned to them.');
+    }
+  }
+
   const workout = await Workout.create(body);
   const populated = await Workout.findById(workout._id)
     .populate('assignedMember', 'fullName email phone gender profileImage')

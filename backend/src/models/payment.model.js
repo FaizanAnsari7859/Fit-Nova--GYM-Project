@@ -10,7 +10,10 @@ const paymentSchema = new mongoose.Schema(
       required: [true, 'Member is required.'],
       index: true,
       validate: {
-        validator: async (id) => {
+        validator: async function (id) {
+          if (this && typeof this.isModified === 'function' && !this.isNew && !this.isModified('member')) {
+            return true;
+          }
           const user = await User.findById(id).select('role');
           return user?.role === 'member';
         },
@@ -23,9 +26,20 @@ const paymentSchema = new mongoose.Schema(
       required: [true, 'Membership is required.'],
       index: true,
       validate: {
-        validator: async (id) => Boolean(await Membership.exists({ _id: id })),
+        validator: async function (id) {
+          if (this && typeof this.isModified === 'function' && !this.isNew && !this.isModified('membership')) {
+            return true;
+          }
+          return Boolean(await Membership.exists({ _id: id }));
+        },
         message: 'Membership plan was not found.',
       },
+    },
+    subscription: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Subscription',
+      default: null,
+      index: true,
     },
     amount: {
       type: Number,
@@ -48,6 +62,11 @@ const paymentSchema = new mongoose.Schema(
       trim: true,
       maxlength: [80, 'Transaction reference must be 80 characters or fewer.'],
     },
+    receiptUrl: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     paymentDate: {
       type: Date,
       required: [true, 'Payment date is required.'],
@@ -55,6 +74,11 @@ const paymentSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+// Compound indexes for member history, status lookups and date ranges
+paymentSchema.index({ member: 1, paymentDate: -1 });
+paymentSchema.index({ paymentStatus: 1, paymentDate: -1 });
+paymentSchema.index({ paymentDate: -1 });
 
 const Payment = mongoose.model('Payment', paymentSchema);
 

@@ -1,78 +1,425 @@
-<div class="trainer-management">
-  <h2 class="section-title">Trainer Management</h2>
+<!-- Page header -->
+<div class="page-header">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Trainer Management</div>
+      <div class="topbar-breadcrumb">FitNova · Admin · Trainers</div>
+    </div>
+    <div class="topbar-actions">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="openAssign()">Assign Member</button>
+      <button type="button" class="btn btn-accent btn-sm" (click)="openAdd()">+ Add Trainer</button>
+    </div>
+  </div>
+</div>
 
-  <!-- Loading / error states -->
-  @if (loading()) {
-    <div class="spinner-overlay"><div class="spinner-sm"></div> Loading trainers...</div>
-  } @else if (error()) {
+<div class="page-content">
+  <!-- Alerts -->
+  @if (success()) {
+    <div class="alert alert-success">{{ success() }}</div>
+  }
+  @if (error() && !modalMode() && !showAssignModal) {
     <div class="alert alert-error">{{ error() }}</div>
-  } @else {
-    <!-- Trainers table -->
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Specialization</th>
-          <th>Experience (years)</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (trainer of trainers(); track trainer._id) {
-          <tr>
-            <td>{{ trainer.fullName }}</td>
-            <td>{{ trainer.specialization ?? '—' }}</td>
-            <td>{{ trainer.experienceYears ?? '—' }}</td>
-          </tr>
-        }
-        @if (trainers().length === 0) {
-          <tr><td colspan="3" class="empty-state">No trainers available.</td></tr>
-        }
-      </tbody>
-    </table>
+  }
 
-    <!-- Assign Trainer button -->
-    <button type="button" class="btn btn-accent" (click)="openAssign()">+ Assign Trainer</button>
+  <!-- Filters -->
+  <div class="filters-bar">
+    <input
+      class="search-input"
+      type="search"
+      placeholder="Search by name or email…"
+      [value]="searchValue()"
+      (input)="onSearchChange($event)"
+    />
+    @if (searchValue()) {
+      <button type="button" class="btn btn-ghost btn-sm" (click)="resetFilters()">
+        Reset
+      </button>
+    }
+  </div>
 
-    <!-- Modal overlay -->
-    @if (showAssign()) {
-      <div class="modal-backdrop" (click)="closeAssign()"></div>
-      <div class="modal">
-        <div class="modal-header">
-          <h3 class="modal-title">Assign Trainer to Member</h3>
-          <button class="btn btn-ghost" (click)="closeAssign()">✕</button>
+  <!-- Table -->
+  <div class="section-card">
+    @if (loading()) {
+      <div class="spinner-overlay">
+        <div class="spinner-sm"></div>
+        Loading trainers…
+      </div>
+    } @else if (trainers().length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon">👨‍🏫</div>
+        <div class="empty-title">No trainers found</div>
+        <div class="empty-sub">Add your first trainer using the button above.</div>
+      </div>
+    } @else {
+      <div class="data-table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Trainer</th>
+              <th>Specialization</th>
+              <th>Experience</th>
+              <th>Assigned Members</th>
+              <th>Joined</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (trainer of trainers(); track trainer._id) {
+              <tr>
+                <td>
+                  <div class="user-cell">
+                    <div class="user-cell-avatar">{{ getInitials(trainer.fullName) }}</div>
+                    <div>
+                      <div class="user-cell-name">{{ trainer.fullName }}</div>
+                      <div class="user-cell-email">{{ trainer.email }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>{{ trainer.specialization || '—' }}</td>
+                <td>{{ trainer.experienceYears != null ? trainer.experienceYears + ' yrs' : '—' }}</td>
+                <td>
+                  <span class="badge badge-member">{{ getAssignedCount(trainer._id) }} members</span>
+                </td>
+                <td>{{ trainer.createdAt | date:'mediumDate' }}</td>
+                <td>
+                  <div class="action-btns">
+                    <button type="button" class="btn-icon" title="View Details" (click)="openView(trainer)">👁</button>
+                    <button type="button" class="btn-icon primary" title="Edit" (click)="openEdit(trainer)">✏️</button>
+                    <button type="button" class="btn-icon danger" title="Delete" (click)="openDelete(trainer)">🗑</button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- ── ADD TRAINER MODAL ──────────────────────────────────── -->
+@if (modalMode() === 'add') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2 class="modal-title">Add New Trainer</h2>
+        <button type="button" class="btn-close-modal" (click)="closeModal()">✕</button>
+      </div>
+      @if (error()) {
+        <div class="alert alert-error">{{ error() }}</div>
+      }
+      <form [formGroup]="addForm" (ngSubmit)="submitAdd()">
+        <div class="form-grid">
+          <div class="form-field">
+            <label>Full Name *</label>
+            <input formControlName="fullName" type="text" placeholder="Jane Smith"
+              [class.invalid]="isAddInvalid('fullName')" />
+            @if (isAddInvalid('fullName')) {
+              <span class="error-text">Full name is required (2–80 characters).</span>
+            }
+          </div>
+          <div class="form-field">
+            <label>Email *</label>
+            <input formControlName="email" type="email" placeholder="jane@example.com"
+              [class.invalid]="isAddInvalid('email')" />
+            @if (isAddInvalid('email')) {
+              <span class="error-text">Valid email is required.</span>
+            }
+          </div>
+          <div class="form-field">
+            <label>Phone *</label>
+            <input formControlName="phone" type="tel" placeholder="10-15 digits"
+              [class.invalid]="isAddInvalid('phone')" />
+            @if (isAddInvalid('phone')) {
+              <span class="error-text">Phone must be 10–15 digits.</span>
+            }
+          </div>
+          <div class="form-field">
+            <label>Gender *</label>
+            <select formControlName="gender" [class.invalid]="isAddInvalid('gender')">
+              <option value="">Select…</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+            @if (isAddInvalid('gender')) {
+              <span class="error-text">Gender is required.</span>
+            }
+          </div>
+          <div class="form-field">
+            <label>Date of Birth</label>
+            <input formControlName="dateOfBirth" type="date" />
+          </div>
+          <div class="form-field">
+            <label>Specialization</label>
+            <input formControlName="specialization" type="text" placeholder="e.g. Strength & Conditioning" />
+          </div>
+          <div class="form-field">
+            <label>Experience (years)</label>
+            <input formControlName="experienceYears" type="number" min="0" placeholder="e.g. 5" />
+          </div>
+          <div class="form-field full-width">
+            <label>Bio</label>
+            <textarea formControlName="bio" rows="3" placeholder="Short bio (max 500 chars)"
+              [class.invalid]="isAddInvalid('bio')"></textarea>
+            @if (isAddInvalid('bio')) {
+              <span class="error-text">Bio cannot exceed 500 characters.</span>
+            }
+          </div>
+          <div class="form-field">
+            <label>Password *</label>
+            <input formControlName="password" type="password" placeholder="Min 8 characters"
+              [class.invalid]="isAddInvalid('password')" />
+            @if (isAddInvalid('password')) {
+              <span class="error-text">Password must be at least 8 characters.</span>
+            }
+          </div>
+          <div class="form-field">
+            <label>Confirm Password *</label>
+            <input formControlName="confirmPassword" type="password" placeholder="Repeat password"
+              [class.invalid]="isAddInvalid('confirmPassword') || addPasswordMismatch" />
+            @if (addPasswordMismatch) {
+              <span class="error-text">Passwords do not match.</span>
+            }
+          </div>
         </div>
-        <div class="modal-body">
-          <form [formGroup]="assignForm" (ngSubmit)="assign()">
-            <label>Member</label>
-            <select formControlName="memberId" required>
-              <option value="" disabled selected>Select member</option>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-accent btn-sm" [disabled]="submitting()">
+            @if (submitting()) { Adding… } @else { Add Trainer }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ── EDIT TRAINER MODAL ──────────────────────────────────── -->
+@if (modalMode() === 'edit') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2 class="modal-title">Edit Trainer</h2>
+        <button type="button" class="btn-close-modal" (click)="closeModal()">✕</button>
+      </div>
+      @if (error()) {
+        <div class="alert alert-error">{{ error() }}</div>
+      }
+      <form [formGroup]="editForm" (ngSubmit)="submitEdit()">
+        <div class="form-grid">
+          <div class="form-field">
+            <label>Full Name *</label>
+            <input formControlName="fullName" type="text"
+              [class.invalid]="isEditInvalid('fullName')" />
+            @if (isEditInvalid('fullName')) {
+              <span class="error-text">Full name is required (2–80 characters).</span>
+            }
+          </div>
+          <div class="form-field">
+            <label>Email *</label>
+            <input formControlName="email" type="email"
+              [class.invalid]="isEditInvalid('email')" />
+            @if (isEditInvalid('email')) {
+              <span class="error-text">Valid email is required.</span>
+            }
+          </div>
+          <div class="form-field">
+            <label>Phone *</label>
+            <input formControlName="phone" type="tel"
+              [class.invalid]="isEditInvalid('phone')" />
+            @if (isEditInvalid('phone')) {
+              <span class="error-text">Phone must be 10–15 digits.</span>
+            }
+          </div>
+          <div class="form-field">
+            <label>Gender *</label>
+            <select formControlName="gender" [class.invalid]="isEditInvalid('gender')">
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Date of Birth</label>
+            <input formControlName="dateOfBirth" type="date" />
+          </div>
+          <div class="form-field">
+            <label>Specialization</label>
+            <input formControlName="specialization" type="text" />
+          </div>
+          <div class="form-field">
+            <label>Experience (years)</label>
+            <input formControlName="experienceYears" type="number" min="0" />
+          </div>
+          <div class="form-field full-width">
+            <label>Bio</label>
+            <textarea formControlName="bio" rows="3"
+              [class.invalid]="isEditInvalid('bio')"></textarea>
+            @if (isEditInvalid('bio')) {
+              <span class="error-text">Bio cannot exceed 500 characters.</span>
+            }
+          </div>
+          <div class="form-field full-width">
+            <label>New Password (leave blank to keep current)</label>
+            <input formControlName="password" type="password" placeholder="Min 8 characters" />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-accent btn-sm" [disabled]="submitting()">
+            @if (submitting()) { Saving… } @else { Save Changes }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ── VIEW TRAINER MODAL ──────────────────────────────────── -->
+@if (modalMode() === 'view' && selectedTrainer()) {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2 class="modal-title">Trainer Details</h2>
+        <button type="button" class="btn-close-modal" (click)="closeModal()">✕</button>
+      </div>
+      <div class="view-avatar-row">
+        <div class="view-avatar">{{ getInitials(selectedTrainer()!.fullName) }}</div>
+        <div>
+          <div class="view-name">{{ selectedTrainer()!.fullName }}</div>
+          <span class="badge badge-trainer">trainer</span>
+        </div>
+      </div>
+      <div class="info-grid" style="margin-top: 20px;">
+        <div class="info-row">
+          <div class="info-label">Email</div>
+          <div class="info-value">{{ selectedTrainer()!.email }}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Phone</div>
+          <div class="info-value">{{ selectedTrainer()!.phone }}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Gender</div>
+          <div class="info-value" style="text-transform: capitalize;">{{ selectedTrainer()!.gender }}</div>
+        </div>
+        @if (selectedTrainer()!.specialization) {
+          <div class="info-row">
+            <div class="info-label">Specialization</div>
+            <div class="info-value">{{ selectedTrainer()!.specialization }}</div>
+          </div>
+        }
+        @if (selectedTrainer()!.experienceYears != null) {
+          <div class="info-row">
+            <div class="info-label">Experience</div>
+            <div class="info-value">{{ selectedTrainer()!.experienceYears }} years</div>
+          </div>
+        }
+        @if (selectedTrainer()!.bio) {
+          <div class="info-row">
+            <div class="info-label">Bio</div>
+            <div class="info-value">{{ selectedTrainer()!.bio }}</div>
+          </div>
+        }
+        <div class="info-row">
+          <div class="info-label">Assigned Members</div>
+          <div class="info-value">{{ getAssignedCount(selectedTrainer()!._id) }}</div>
+        </div>
+        @if (getAssignedMembers(selectedTrainer()!._id).length > 0) {
+          <div class="info-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+            <div class="info-label">Member List</div>
+            <div class="assigned-members-list">
+              @for (m of getAssignedMembers(selectedTrainer()!._id); track m.email) {
+                <div class="assigned-member-chip">
+                  <span>{{ m.fullName }}</span>
+                  <span class="chip-email">{{ m.email }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+        <div class="info-row">
+          <div class="info-label">Member Since</div>
+          <div class="info-value">{{ selectedTrainer()!.createdAt | date:'mediumDate' }}</div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost btn-sm" (click)="closeModal()">Close</button>
+        <button type="button" class="btn btn-accent btn-sm" (click)="openEdit(selectedTrainer()!)">Edit Trainer</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ── DELETE CONFIRM MODAL ─────────────────────────────── -->
+@if (modalMode() === 'delete' && selectedTrainer()) {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2 class="modal-title">Delete Trainer</h2>
+        <button type="button" class="btn-close-modal" (click)="closeModal()">✕</button>
+      </div>
+      @if (error()) {
+        <div class="alert alert-error">{{ error() }}</div>
+      }
+      <div class="confirm-dialog">
+        <div class="confirm-icon">⚠️</div>
+        <p>
+          Are you sure you want to delete
+          <strong>{{ selectedTrainer()!.fullName }}</strong>?
+          This action cannot be undone.
+        </p>
+        <div class="form-actions" style="justify-content: center;">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="closeModal()">Cancel</button>
+          <button type="button" class="btn btn-sm btn-danger" [disabled]="submitting()" (click)="confirmDelete()">
+            @if (submitting()) { Deleting… } @else { Delete Trainer }
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ── ASSIGN MEMBER MODAL ─────────────────────────────── -->
+@if (showAssignModal) {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2 class="modal-title">Assign Member to Trainer</h2>
+        <button type="button" class="btn-close-modal" (click)="closeModal()">✕</button>
+      </div>
+      @if (error()) {
+        <div class="alert alert-error">{{ error() }}</div>
+      }
+      <form [formGroup]="assignForm" (ngSubmit)="assign()">
+        <div class="form-grid">
+          <div class="form-field full-width">
+            <label>Member *</label>
+            <select formControlName="memberId">
+              <option value="" disabled selected>Select member…</option>
               @for (member of members(); track member._id) {
                 <option [value]="member._id">{{ member.fullName }} ({{ member.email }})</option>
               }
             </select>
-
-            <label>Trainer</label>
-            <select formControlName="trainerId" required>
-              <option value="" disabled selected>Select trainer</option>
+          </div>
+          <div class="form-field full-width">
+            <label>Trainer *</label>
+            <select formControlName="trainerId">
+              <option value="" disabled selected>Select trainer…</option>
               @for (trainer of trainers(); track trainer._id) {
                 <option [value]="trainer._id">{{ trainer.fullName }}</option>
               }
             </select>
-
-            <div class="modal-actions">
-              <button type="button" class="btn btn-ghost" (click)="closeAssign()">Cancel</button>
-              <button type="submit" class="btn btn-primary" [disabled]="submitting() || assignForm.invalid">
-                @if (submitting()) { Assigning... } @else { Assign }
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
-      </div>
-    }
-
-
-    @if (success()) {
-      <div class="alert alert-success">{{ success() }}</div>
-    }
-  }
-</div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-accent btn-sm"
+            [disabled]="submitting() || assignForm.invalid">
+            @if (submitting()) { Assigning… } @else { Assign }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

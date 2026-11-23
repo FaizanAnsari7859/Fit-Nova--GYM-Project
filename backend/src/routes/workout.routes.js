@@ -4,6 +4,7 @@ import {
   deleteWorkout,
   getWorkoutById,
   getWorkouts,
+  updateExerciseProgress,
   updateWorkout,
   updateWorkoutStatus,
 } from '../controllers/workout.controller.js';
@@ -20,6 +21,7 @@ router.get('/:id', asyncHandler(getWorkoutById));
 router.post('/', requireRole('admin', 'trainer'), asyncHandler(createWorkout));
 router.patch('/:id', asyncHandler(updateWorkout));
 router.patch('/:id/status', asyncHandler(updateWorkoutStatus));
+router.patch('/:id/exercises/:exerciseIdx', asyncHandler(updateExerciseProgress));
 router.delete('/:id', requireRole('admin', 'trainer'), asyncHandler(deleteWorkout));
 
 export default router;

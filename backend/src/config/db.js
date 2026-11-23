@@ -5,6 +5,7 @@ import Membership from '../models/membership.model.js';
 import Payment from '../models/payment.model.js';
 import User from '../models/user.model.js';
 import Workout from '../models/workout.model.js';
+import Subscription from '../models/subscription.model.js';
 
 const redact = (message) =>
   String(message || 'Database connection failed.').replace(
@@ -31,6 +32,7 @@ export const connectDB = async () => {
       Workout.init(),
       Payment.init(),
       Attendance.init(),
+      Subscription.init(),
     ]);
     console.log('MongoDB connected.');
   } catch (error) {

@@ -41,6 +41,9 @@ const membershipSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// Compound index for active plan queries sorted by price
+membershipSchema.index({ status: 1, price: 1 });
+
 const Membership = mongoose.model('Membership', membershipSchema);
 
 export default Membership;

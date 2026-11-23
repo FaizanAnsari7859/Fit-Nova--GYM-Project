@@ -6,12 +6,13 @@ import {
   signal,
 } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { MemberOverview, UserService } from '../../../core/services/user.service';
 
 @Component({
   selector: 'app-member-dashboard',
-  imports: [CurrencyPipe, DatePipe],
+  imports: [CurrencyPipe, DatePipe, RouterLink],
   templateUrl: './member-dashboard.html',
   styleUrl: './member-dashboard.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -29,7 +30,7 @@ export class MemberDashboard implements OnInit {
     this.loadOverview();
   }
 
-  private loadOverview(): void {
+  protected loadOverview(): void {
     this.loading.set(true);
     this.error.set(null);
     this.userService.getMemberOverview().subscribe({
@@ -47,7 +48,7 @@ export class MemberDashboard implements OnInit {
   }
 
   protected getInitials(name: string): string {
-    return name
+    return (name || '')
       .split(' ')
       .map((n) => n[0])
       .join('')
@@ -57,9 +58,14 @@ export class MemberDashboard implements OnInit {
 
   protected getStatusBadgeClass(status: string): string {
     const s = status?.toLowerCase();
-    if (s === 'active' || s === 'completed' || s === 'paid') return 'badge badge-paid';
-    if (s === 'pending') return 'badge badge-pending';
+    if (s === 'active' || s === 'completed' || s === 'paid' || s === 'present') return 'badge badge-paid';
+    if (s === 'pending' || s === 'late') return 'badge badge-pending';
     return 'badge badge-failed';
   }
-}
 
+  protected getMembershipBadgeClass(status?: string): string {
+    if (status === 'active') return 'badge badge-paid';
+    if (status === 'expired') return 'badge badge-failed';
+    return 'badge badge-pending';
+  }
+}

@@ -104,7 +104,10 @@ const workoutSchema = new mongoose.Schema(
       required: [true, 'Assigned member is required.'],
       index: true,
       validate: {
-        validator: async (id) => {
+        validator: async function (id) {
+          if (this && typeof this.isModified === 'function' && !this.isNew && !this.isModified('assignedMember')) {
+            return true;
+          }
           const user = await User.findById(id).select('role');
           return user?.role === 'member';
         },
@@ -117,7 +120,10 @@ const workoutSchema = new mongoose.Schema(
       required: [true, 'Assigned trainer is required.'],
       index: true,
       validate: {
-        validator: async (id) => {
+        validator: async function (id) {
+          if (this && typeof this.isModified === 'function' && !this.isNew && !this.isModified('assignedTrainer')) {
+            return true;
+          }
           const user = await User.findById(id).select('role');
           return user?.role === 'trainer';
         },
@@ -127,6 +133,10 @@ const workoutSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+// Compound indexes for assigned queries and status filtering
+workoutSchema.index({ assignedMember: 1, status: 1, createdAt: -1 });
+workoutSchema.index({ assignedTrainer: 1, status: 1, createdAt: -1 });
 
 const Workout = mongoose.model('Workout', workoutSchema);
 

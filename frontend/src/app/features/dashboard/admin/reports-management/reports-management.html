@@ -1,0 +1,547 @@
+<div class="page-header">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Reports & Analytics</div>
+      <div class="topbar-breadcrumb">FitNova · Admin · Business Intelligence</div>
+    </div>
+    <div class="topbar-actions" style="display: flex; gap: 8px;">
+      <button type="button" class="btn btn-secondary btn-sm" (click)="loadReports()" [disabled]="loading()">
+        🔄 Refresh
+      </button>
+      <button type="button" class="btn btn-accent btn-sm" (click)="printReport()">
+        🖨️ Export / Print
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="page-content">
+  <!-- Notifications -->
+  @if (error()) {
+    <div class="alert alert-error animate-fade-in" style="margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span>{{ error() }}</span>
+        <button type="button" class="btn btn-secondary btn-xs" (click)="loadReports()">Retry</button>
+      </div>
+    </div>
+  }
+
+  <!-- Filter & Tab Toolbar -->
+  <div class="section-card" style="margin-bottom: 24px; padding: 16px 20px;">
+    <!-- Report Type Tabs -->
+    <div class="report-tabs" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; border-bottom: 1px solid var(--color-line); padding-bottom: 14px;">
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="activeTab() === 'all'"
+        (click)="setTab('all')"
+      >
+        📊 Executive Summary
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="activeTab() === 'membership'"
+        (click)="setTab('membership')"
+      >
+        🏷️ Membership Reports
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="activeTab() === 'payments'"
+        (click)="setTab('payments')"
+      >
+        💰 Payment & Revenue Reports
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="activeTab() === 'attendance'"
+        (click)="setTab('attendance')"
+      >
+        ⏱️ Attendance Reports
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="activeTab() === 'registrations'"
+        (click)="setTab('registrations')"
+      >
+        👥 Member Registrations
+      </button>
+    </div>
+
+    <!-- Date Range & Status Filters Row -->
+    <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+      <!-- Date Presets -->
+      <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+        <span style="font-size: 0.82rem; color: var(--color-muted); margin-right: 4px;">Timeframe:</span>
+        <button
+          type="button"
+          class="preset-pill"
+          [class.active]="selectedPreset() === 'all'"
+          (click)="onPresetChange('all')"
+        >
+          All Time
+        </button>
+        <button
+          type="button"
+          class="preset-pill"
+          [class.active]="selectedPreset() === 'today'"
+          (click)="onPresetChange('today')"
+        >
+          Today
+        </button>
+        <button
+          type="button"
+          class="preset-pill"
+          [class.active]="selectedPreset() === '7days'"
+          (click)="onPresetChange('7days')"
+        >
+          Last 7 Days
+        </button>
+        <button
+          type="button"
+          class="preset-pill"
+          [class.active]="selectedPreset() === '30days'"
+          (click)="onPresetChange('30days')"
+        >
+          Last 30 Days
+        </button>
+        <button
+          type="button"
+          class="preset-pill"
+          [class.active]="selectedPreset() === 'this_month'"
+          (click)="onPresetChange('this_month')"
+        >
+          This Month
+        </button>
+      </div>
+
+      <!-- Custom Date Inputs -->
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <label style="font-size: 0.8rem; color: var(--color-muted);">From:</label>
+          <input
+            type="date"
+            class="filter-date-input"
+            [ngModel]="startDate()"
+            (ngModelChange)="startDate.set($event); onDateChange()"
+          />
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <label style="font-size: 0.8rem; color: var(--color-muted);">To:</label>
+          <input
+            type="date"
+            class="filter-date-input"
+            [ngModel]="endDate()"
+            (ngModelChange)="endDate.set($event); onDateChange()"
+          />
+        </div>
+
+        <!-- Status Filter (Dynamic) -->
+        @if (activeTab() === 'payments') {
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label style="font-size: 0.8rem; color: var(--color-muted);">Status:</label>
+            <select
+              class="filter-select"
+              [ngModel]="statusFilter()"
+              (ngModelChange)="onStatusChange($event)"
+            >
+              <option value="all">All Payments</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+        } @else if (activeTab() === 'attendance') {
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label style="font-size: 0.8rem; color: var(--color-muted);">Status:</label>
+            <select
+              class="filter-select"
+              [ngModel]="statusFilter()"
+              (ngModelChange)="onStatusChange($event)"
+            >
+              <option value="all">All Statuses</option>
+              <option value="present">Present</option>
+              <option value="late">Late</option>
+              <option value="absent">Absent</option>
+            </select>
+          </div>
+        } @else if (activeTab() === 'registrations') {
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label style="font-size: 0.8rem; color: var(--color-muted);">Role:</label>
+            <select
+              class="filter-select"
+              [ngModel]="statusFilter()"
+              (ngModelChange)="onStatusChange($event)"
+            >
+              <option value="all">All Roles</option>
+              <option value="member">Members</option>
+              <option value="trainer">Trainers</option>
+            </select>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="spinner-overlay">
+      <div class="spinner-sm"></div>
+      Loading report data…
+    </div>
+  } @else if (report()) {
+    <!-- TOP STAT CARDS -->
+    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 24px;">
+      <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-value">{{ report()!.summary.totalMembers }}</div>
+        <div class="stat-label">Total Members</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">👨‍🏫</div>
+        <div class="stat-value">{{ report()!.summary.totalTrainers }}</div>
+        <div class="stat-label">Total Trainers</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div class="stat-value" style="color: var(--color-success, #22c55e);">
+          {{ report()!.summary.activeMemberships }}
+        </div>
+        <div class="stat-label">Active Memberships</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⏳</div>
+        <div class="stat-value" style="color: var(--color-warning, #f59e0b);">
+          {{ report()!.summary.expiredMemberships }}
+        </div>
+        <div class="stat-label">Expired Memberships</div>
+      </div>
+      <div class="stat-card accent">
+        <div class="stat-icon">💰</div>
+        <div class="stat-value">{{ report()!.summary.totalRevenue | currency:'USD':'symbol':'1.0-0' }}</div>
+        <div class="stat-label">Total Revenue Collected</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⏱️</div>
+        <div class="stat-value">{{ report()!.summary.totalCheckIns }}</div>
+        <div class="stat-label">Total Check-Ins</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🏋️</div>
+        <div class="stat-value">{{ report()!.summary.totalWorkouts }}</div>
+        <div class="stat-label">Assigned Workouts</div>
+      </div>
+    </div>
+
+    <!-- TAB 1: EXECUTIVE SUMMARY -->
+    @if (activeTab() === 'all') {
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px;">
+        <!-- Membership Highlights -->
+        <div class="section-card">
+          <div class="section-card-header">
+            <h2 class="section-card-title">Membership Overview</h2>
+            <button type="button" class="btn btn-ghost btn-xs" (click)="setTab('membership')">Detailed Report →</button>
+          </div>
+          <div class="breakdown-grid">
+            <div class="breakdown-item">
+              <span class="breakdown-label">Active Plans</span>
+              <span class="breakdown-value">{{ report()!.membershipReport?.activePlans ?? 0 }}</span>
+            </div>
+            <div class="breakdown-item">
+              <span class="breakdown-label">Active Subscriptions</span>
+              <span class="breakdown-value" style="color: var(--color-success, #22c55e);">
+                {{ report()!.membershipReport?.activeSubscriptions ?? 0 }}
+              </span>
+            </div>
+            <div class="breakdown-item">
+              <span class="breakdown-label">Expired Subscriptions</span>
+              <span class="breakdown-value" style="color: var(--color-warning, #f59e0b);">
+                {{ report()!.membershipReport?.expiredSubscriptions ?? 0 }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Payments Highlights -->
+        <div class="section-card">
+          <div class="section-card-header">
+            <h2 class="section-card-title">Revenue Highlights</h2>
+            <button type="button" class="btn btn-ghost btn-xs" (click)="setTab('payments')">Detailed Report →</button>
+          </div>
+          <div class="breakdown-grid">
+            <div class="breakdown-item">
+              <span class="breakdown-label">Paid Invoices</span>
+              <span class="breakdown-value" style="color: var(--color-success, #22c55e);">
+                {{ report()!.paymentReport?.paidCount ?? 0 }}
+              </span>
+            </div>
+            <div class="breakdown-item">
+              <span class="breakdown-label">Pending Invoices</span>
+              <span class="breakdown-value" style="color: var(--color-warning, #f59e0b);">
+                {{ report()!.paymentReport?.pendingCount ?? 0 }} ({{ report()!.paymentReport?.pendingAmount ?? 0 | currency:'USD':'symbol':'1.0-0' }})
+              </span>
+            </div>
+            <div class="breakdown-item">
+              <span class="breakdown-label">Failed Invoices</span>
+              <span class="breakdown-value" style="color: var(--color-danger, #ef4444);">
+                {{ report()!.paymentReport?.failedCount ?? 0 }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Attendance Highlights -->
+        <div class="section-card">
+          <div class="section-card-header">
+            <h2 class="section-card-title">Attendance Highlights</h2>
+            <button type="button" class="btn btn-ghost btn-xs" (click)="setTab('attendance')">Detailed Report →</button>
+          </div>
+          <div class="breakdown-grid">
+            <div class="breakdown-item">
+              <span class="breakdown-label">Total Visits Logged</span>
+              <span class="breakdown-value">{{ report()!.attendanceReport?.totalRecords ?? 0 }}</span>
+            </div>
+            <div class="breakdown-item">
+              <span class="breakdown-label">Present Visits</span>
+              <span class="breakdown-value" style="color: var(--color-success, #22c55e);">
+                {{ report()!.attendanceReport?.presentCount ?? 0 }}
+              </span>
+            </div>
+            <div class="breakdown-item">
+              <span class="breakdown-label">Unique Athletes</span>
+              <span class="breakdown-value">{{ report()!.attendanceReport?.uniqueMembersAttended ?? 0 }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Registration Highlights -->
+        <div class="section-card">
+          <div class="section-card-header">
+            <h2 class="section-card-title">Registration Highlights</h2>
+            <button type="button" class="btn btn-ghost btn-xs" (click)="setTab('registrations')">Detailed Report →</button>
+          </div>
+          <div class="breakdown-grid">
+            <div class="breakdown-item">
+              <span class="breakdown-label">Total Users</span>
+              <span class="breakdown-value">{{ report()!.registrationReport?.totalRegistrations ?? 0 }}</span>
+            </div>
+            <div class="breakdown-item">
+              <span class="breakdown-label">Members</span>
+              <span class="breakdown-value">{{ report()!.registrationReport?.membersCount ?? 0 }}</span>
+            </div>
+            <div class="breakdown-item">
+              <span class="breakdown-label">Trainers</span>
+              <span class="breakdown-value">{{ report()!.registrationReport?.trainersCount ?? 0 }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- TAB 2: MEMBERSHIP REPORTS -->
+    @if (activeTab() === 'membership' && report()!.membershipReport) {
+      <div class="section-card">
+        <div class="section-card-header">
+          <h2 class="section-card-title">Membership Plans Distribution</h2>
+          <span class="counter-badge">{{ report()!.membershipReport!.plans.length }} Plans</span>
+        </div>
+        <div class="data-table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Plan Name</th>
+                <th>Price</th>
+                <th>Duration</th>
+                <th>Status</th>
+                <th>Subscribers Count</th>
+                <th>Revenue Generated</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (plan of report()!.membershipReport!.plans; track plan._id) {
+                <tr>
+                  <td style="font-weight: 700;">{{ plan.planName }}</td>
+                  <td>{{ plan.price | currency:'USD':'symbol':'1.0-0' }}</td>
+                  <td>{{ plan.duration }} days</td>
+                  <td><span [class]="getMembershipBadge(plan.status)">{{ plan.status }}</span></td>
+                  <td style="font-weight: 600;">{{ plan.subscribersCount }} members</td>
+                  <td style="font-weight: 700; color: var(--color-orange, #ff6b35);">
+                    {{ plan.totalRevenue | currency:'USD':'symbol':'1.0-0' }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+
+    <!-- TAB 3: PAYMENT REPORTS -->
+    @if (activeTab() === 'payments' && report()!.paymentReport) {
+      <div class="section-card">
+        <div class="section-card-header">
+          <h2 class="section-card-title">Payment Transaction Records</h2>
+          <span class="counter-badge">{{ report()!.paymentReport!.totalCount }} Transactions</span>
+        </div>
+        @if (report()!.paymentReport!.payments.length === 0) {
+          <div class="empty-state">
+            <div class="empty-icon">💳</div>
+            <div class="empty-title">No payment transactions found</div>
+            <p style="color: var(--color-muted); font-size: 0.88rem;">
+              No payments match the selected timeframe and status filter.
+            </p>
+          </div>
+        } @else {
+          <div class="data-table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Reference</th>
+                  <th>Member</th>
+                  <th>Plan</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Payment Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (p of report()!.paymentReport!.payments; track p._id) {
+                  <tr>
+                    <td style="font-family: monospace; font-size: 0.82rem;">{{ p.transactionReference }}</td>
+                    <td>
+                      <div class="user-cell">
+                        <div class="user-cell-avatar">{{ getInitials(p.member?.fullName) }}</div>
+                        <div>
+                          <div class="user-cell-name">{{ p.member?.fullName ?? 'Unknown' }}</div>
+                          <div class="user-cell-email">{{ p.member?.email ?? '' }}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>{{ p.membership?.planName ?? 'Standard' }}</td>
+                    <td style="font-weight: 700;">{{ p.amount | currency:'USD':'symbol':'1.0-0' }}</td>
+                    <td><span [class]="getPaymentBadge(p.paymentStatus)">{{ p.paymentStatus }}</span></td>
+                    <td>{{ p.paymentDate | date:'mediumDate' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- TAB 4: ATTENDANCE REPORTS -->
+    @if (activeTab() === 'attendance' && report()!.attendanceReport) {
+      <div class="section-card">
+        <div class="section-card-header">
+          <h2 class="section-card-title">Attendance Activity Records</h2>
+          <span class="counter-badge">{{ report()!.attendanceReport!.totalRecords }} Records</span>
+        </div>
+        @if (report()!.attendanceReport!.records.length === 0) {
+          <div class="empty-state">
+            <div class="empty-icon">⏱️</div>
+            <div class="empty-title">No attendance records found</div>
+            <p style="color: var(--color-muted); font-size: 0.88rem;">
+              No check-in logs match the selected timeframe and filter.
+            </p>
+          </div>
+        } @else {
+          <div class="data-table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Member</th>
+                  <th>Date</th>
+                  <th>Check-In</th>
+                  <th>Check-Out</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (att of report()!.attendanceReport!.records; track att._id) {
+                  <tr>
+                    <td>
+                      <div class="user-cell">
+                        <div class="user-cell-avatar">{{ getInitials(att.member?.fullName) }}</div>
+                        <div>
+                          <div class="user-cell-name">{{ att.member?.fullName ?? 'Unknown Member' }}</div>
+                          <div class="user-cell-email">{{ att.member?.email ?? '' }}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>{{ (att.attendanceDate || att.checkInTime) | date:'mediumDate' }}</td>
+                    <td>{{ att.checkInTime | date:'shortTime' }}</td>
+                    <td>
+                      @if (att.checkOutTime) {
+                        {{ att.checkOutTime | date:'shortTime' }}
+                      } @else {
+                        <span style="color: var(--color-warning, #f59e0b); font-size: 0.82rem;">In Gym</span>
+                      }
+                    </td>
+                    <td><span [class]="getAttendanceBadge(att.status)">{{ att.status }}</span></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- TAB 5: REGISTRATION REPORTS -->
+    @if (activeTab() === 'registrations' && report()!.registrationReport) {
+      <div class="section-card">
+        <div class="section-card-header">
+          <h2 class="section-card-title">Member & Trainer Registrations</h2>
+          <span class="counter-badge">{{ report()!.registrationReport!.totalRegistrations }} Users</span>
+        </div>
+        @if (report()!.registrationReport!.registrations.length === 0) {
+          <div class="empty-state">
+            <div class="empty-icon">👥</div>
+            <div class="empty-title">No registrations found</div>
+            <p style="color: var(--color-muted); font-size: 0.88rem;">
+              No registered users match the selected timeframe and filter.
+            </p>
+          </div>
+        } @else {
+          <div class="data-table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Phone</th>
+                  <th>Gender</th>
+                  <th>Registration Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (u of report()!.registrationReport!.registrations; track u._id) {
+                  <tr>
+                    <td>
+                      <div class="user-cell">
+                        <div class="user-cell-avatar">{{ getInitials(u.fullName) }}</div>
+                        <div>
+                          <div class="user-cell-name">{{ u.fullName }}</div>
+                          <div class="user-cell-email">{{ u.email }}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span [class]="'badge badge-' + u.role">{{ u.role }}</span></td>
+                    <td>{{ u.phone || '—' }}</td>
+                    <td style="text-transform: capitalize;">{{ u.gender || '—' }}</td>
+                    <td>{{ u.createdAt | date:'mediumDate' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+  }
+</div>
+
